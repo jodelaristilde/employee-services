@@ -904,12 +904,8 @@
           <strong>Firebase:</strong> Paste your Firebase config object below.
         </div>
 
-        <div class="card" style="margin-bottom:1rem">
-          <div class="card-title">Firebase Config</div>
-          <div class="field">
-            <label>Firebase Config JSON</label>
-            <textarea id="cfg-firebase" rows="6" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...",...}'></textarea>
-          </div>
+        <div class="card" style="margin-bottom:1rem;background:#edfaf3;border:1px solid #7edba8;">
+          <div style="font-size:.85rem;color:#1a6e3f;">✅ <strong>Firebase is connected.</strong> The database is permanently configured — no setup needed.</div>
         </div>
 
         <div class="card" style="margin-bottom:1rem">
@@ -1053,6 +1049,8 @@ function loadConfig() {
   try { CFG = JSON.parse(localStorage.getItem('timeoff_cfg') || '{}'); } catch(e) { CFG = {}; }
 }
 loadConfig();
+// Auto-init Firebase immediately on page load
+initFirebase();
 
 // ══════════════════════════════════════════
 // FIREBASE INIT
@@ -1060,13 +1058,15 @@ loadConfig();
 function initFirebase() {
   if (db) return true;
   try {
-    // Use hardcoded config first, fall back to settings
-    const fcfg = FIREBASE_CONFIG;
-    if (!firebase.apps.length) firebase.initializeApp(fcfg);
-    else firebase.app(); // reuse existing
+    if (!firebase.apps || !firebase.apps.length) {
+      firebase.initializeApp(FIREBASE_CONFIG);
+    }
     db = firebase.database();
     return true;
-  } catch(e) { console.error('Firebase init error:', e); return false; }
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    return false;
+  }
 }
 
 
@@ -1991,7 +1991,15 @@ function removeAdminManager(i) {
 // ADMIN — LOAD DATA
 // ══════════════════════════════════════════
 function loadAdminData() {
-  if (!initFirebase()) return;
+  initFirebase();
+  if (!db) {
+    setTimeout(() => {
+      initFirebase();
+      if (db) { loadAdminRequests(); loadEmployeeTable(); loadSettingsForm(); populateYearSelect(); loadAdminManagers(); }
+      else showToast('Connection error. Please refresh the page.', 'error');
+    }, 1000);
+    return;
+  }
   switchAdmin('admin-requests');
   loadAdminRequests();
   loadEmployeeTable();
@@ -2003,6 +2011,12 @@ function loadAdminData() {
 async function loadAdminRequests() {
   const pending = document.getElementById('admin-requests-list');
   const all = document.getElementById('admin-all-requests-list');
+  if (!db) {
+    const msg = '<div style="text-align:center;padding:2rem;color:var(--red);">⚠️ Not connected. Open this file from a web server or <a href="https://training-eight-azure.vercel.app" target="_blank" style="color:var(--accent)">deploy it on Vercel</a>.<br><br><button class="btn btn-gold" onclick="initFirebase();loadAdminRequests()">Try Again</button></div>';
+    pending.innerHTML = msg;
+    all.innerHTML = '';
+    return;
+  }
   const snap = await db.ref('requests').once('value');
   const reqs = snap.val() || {};
   const sorted = Object.entries(reqs).sort((a,b)=>b[1].createdAt-a[1].createdAt);
@@ -2323,7 +2337,6 @@ async function deleteEmployee(id) {
 // ══════════════════════════════════════════
 function loadSettingsForm() {
   loadConfig();
-  if (CFG.firebase) document.getElementById('cfg-firebase').value = CFG.firebase;
   if (CFG.ejsService) document.getElementById('cfg-ejs-service').value = CFG.ejsService;
   if (CFG.ejsTemplate) document.getElementById('cfg-ejs-template').value = CFG.ejsTemplate;
   if (CFG.ejsKey) document.getElementById('cfg-ejs-key').value = CFG.ejsKey;
@@ -2338,9 +2351,8 @@ function loadSettingsForm() {
 }
 
 function saveSettings() {
-  const newPass = document.getElementById('cfg-admin-pass').value;
+  const newPass = document.getElementById('cfg-admin-pass') ? document.getElementById('cfg-admin-pass').value : '';
   CFG = {
-    firebase: document.getElementById('cfg-firebase').value.trim(),
     ejsService: document.getElementById('cfg-ejs-service').value.trim(),
     ejsTemplate: document.getElementById('cfg-ejs-template').value.trim(),
     ejsKey: document.getElementById('cfg-ejs-key').value.trim(),
@@ -2354,8 +2366,6 @@ function saveSettings() {
     twilioFn: document.getElementById('cfg-twilio-fn').value.trim(),
   };
   localStorage.setItem('timeoff_cfg', JSON.stringify(CFG));
-  db = null;
-  initFirebase();
   showToast('Settings saved!','success');
 }
 
