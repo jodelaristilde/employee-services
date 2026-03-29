@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -756,7 +757,7 @@
         <div class="type-grid">
           <div class="type-card" id="type-vacation" onclick="selectType('vacation')"><span class="icon">🌴</span><span id="type-vacation-lbl">Vacation</span></div>
           <div class="type-card" id="type-sick" onclick="selectType('sick')"><span class="icon">🤒</span><span id="type-sick-lbl">Sick Day</span></div>
-          <div class="type-card" id="type-personal" onclick="selectType('personal')"><span class="icon">🧘</span><span id="type-personal-lbl">Personal Day</span></div>
+          
         </div>
         <div class="row">
           <div class="field">
@@ -772,6 +773,7 @@
           <label id="label-note">Note (optional)</label>
           <textarea id="req-note" placeholder="Any additional details..."></textarea>
         </div>
+
         <button id="btn-submit-req" class="btn btn-gold" onclick="submitRequest()">Submit Request</button>
       </div>
     </div>
@@ -885,7 +887,6 @@
                 <th>PIN</th>
                 <th>Vac</th>
                 <th>Sick</th>
-                <th>Personal</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -980,7 +981,6 @@
     <div class="settings-grid">
       <div class="setting-item"><label>🌴 Vacation Days</label><input type="number" id="modal-vac" value="10" min="0"></div>
       <div class="setting-item"><label>🤒 Sick Days</label><input type="number" id="modal-sick" value="5" min="0"></div>
-      <div class="setting-item"><label>🧘 Personal Days</label><input type="number" id="modal-personal" value="3" min="0"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('modal-employee')">Cancel</button>
@@ -1029,6 +1029,7 @@
 // ══════════════════════════════════════════
 let CFG = {};
 let db = null;
+let storage = null;
 let currentEmployee = null;
 let selectedType = null;
 let pendingRejectId = null;
@@ -1062,6 +1063,7 @@ function initFirebase() {
       firebase.initializeApp(FIREBASE_CONFIG);
     }
     db = firebase.database();
+    storage = firebase.storage();
     return true;
   } catch(e) {
     console.error('Firebase init error:', e);
@@ -1123,7 +1125,6 @@ const LANGS = {
     requestType: 'Request Type',
     vacation: 'Vacation',
     sick: 'Sick Day',
-    personal: 'Personal Day',
     startDate: 'Start Date',
     endDate: 'End Date',
     note: 'Note (optional)',
@@ -1184,7 +1185,6 @@ const LANGS = {
     requestType: 'Tipo de Solicitud',
     vacation: 'Vacaciones',
     sick: 'Día de Enfermedad',
-    personal: 'Día Personal',
     startDate: 'Fecha de Inicio',
     endDate: 'Fecha de Fin',
     note: 'Nota (opcional)',
@@ -1245,7 +1245,6 @@ const LANGS = {
     requestType: 'Tip Demann',
     vacation: 'Vakans',
     sick: 'Jou Malad',
-    personal: 'Jou Pèsonèl',
     startDate: 'Dat Kòmansman',
     endDate: 'Dat Fen',
     note: 'Nòt (opsyonèl)',
@@ -1644,6 +1643,7 @@ function selectType(type) {
   selectedType = type;
   document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('type-'+type).classList.add('selected');
+
 }
 
 async function submitRequest() {
@@ -1684,6 +1684,7 @@ async function submitRequest() {
     employeeId: emp.id,
     employeeName: `${emp.first} ${emp.last}`,
     employeePhone: emp.phone || '',
+    employeeEmail: emp.email || '',
     type: selectedType,
     typeLabel,
     start, end, days,
@@ -1694,16 +1695,20 @@ async function submitRequest() {
   };
 
   try {
-    await db.ref('requests').push(req);
-    // Notify manager
+    const newRef = db.ref('requests').push();
+    const reqId = newRef.key;
+
+    await newRef.set(req);
     notifyManager(req);
     showToast('✅ Request submitted!','success');
     selectedType = null;
+
     document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('req-start').value = '';
     document.getElementById('req-end').value = '';
     document.getElementById('req-note').value = '';
-  } catch(e) { showToast('Error submitting. Try again.','error'); }
+
+  } catch(e) { console.error(e); showToast('Error submitting. Try again.','error'); }
 }
 
 // ══════════════════════════════════════════
@@ -1781,7 +1786,6 @@ async function renderBalance() {
   const types = [
     {key:'vacation',label:'Vacation',icon:'🌴',limitKey:'limitVac'},
     {key:'sick',label:'Sick Days',icon:'🤒',limitKey:'limitSick'},
-    {key:'personal',label:'Personal',icon:'🧘',limitKey:'limitPersonal'},
   ];
   const grid = document.getElementById('emp-balance-grid');
   grid.innerHTML = types.map(t => {
@@ -1810,7 +1814,7 @@ async function checkNewDecisions() {
 
   const sorted = reqs.sort((a,b) => b.createdAt - a.createdAt);
   const typeLabels = {vacation:'Vacation',sick:'Sick Day',personal:'Personal Day'};
-  const typeIcons = {vacation:'\ud83c\udf34',sick:'\ud83e\udd12',callout:'\ud83d\udcf5',personal:'\ud83e\uddd8'};
+  const typeIcons = {vacation:'\ud83c\udf34',sick:'\ud83e\udd12',callout:'\ud83d\udcf5'};
 
   const items = sorted.map(r => {
     const submitted = new Date(r.createdAt).toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
@@ -1920,13 +1924,28 @@ async function employeeResetPin() {
 // ══════════════════════════════════════════
 let adminManagers = []; // [{name, email, password, enabled}]
 
-function loadAdminManagers() {
+async function loadAdminManagers() {
+  // Try Firebase first
+  try {
+    if (db) {
+      const snap = await db.ref('config/admin_managers').once('value');
+      if (snap.val()) {
+        adminManagers = snap.val();
+        localStorage.setItem('admin_managers', JSON.stringify(adminManagers));
+        renderAdminManagers();
+        return;
+      }
+    }
+  } catch(e) {}
+  // Fall back to localStorage
   try { adminManagers = JSON.parse(localStorage.getItem('admin_managers') || '[]'); } catch(e) { adminManagers = []; }
   renderAdminManagers();
 }
 
 function saveAdminManagers() {
   localStorage.setItem('admin_managers', JSON.stringify(adminManagers));
+  // Also save to Firebase so it persists everywhere
+  if (db) db.ref('config/admin_managers').set(adminManagers).catch(()=>{});
 }
 
 function renderAdminManagers() {
@@ -1987,6 +2006,112 @@ function removeAdminManager(i) {
   renderAdminManagers();
 }
 
+
+// ══════════════════════════════════════════
+// DOCTOR'S NOTE UPLOAD
+// ══════════════════════════════════════════
+let selectedNoteFile = null;
+
+function handleNoteFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  selectedNoteFile = file;
+  showNotePreview(file);
+}
+
+function handleNoteDrop(e) {
+  e.preventDefault();
+  document.getElementById('note-upload-area').style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  selectedNoteFile = file;
+  showNotePreview(file);
+}
+
+function showNotePreview(file) {
+  const placeholder = document.getElementById('note-upload-placeholder');
+  const preview = document.getElementById('note-upload-preview');
+  const img = document.getElementById('note-preview-img');
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => { img.src = e.target.result; };
+    reader.readAsDataURL(file);
+    img.style.display = 'block';
+  } else {
+    img.style.display = 'none';
+    img.src = '';
+  }
+  placeholder.style.display = 'none';
+  preview.style.display = 'block';
+  // Show filename for PDFs
+  if (!file.type.startsWith('image/')) {
+    preview.innerHTML = '<div style="padding:1rem;text-align:center;">📄 ' + file.name + '<br><span style="font-size:.78rem;color:var(--muted)">Ready to upload</span></div>' +
+      '<button onclick="event.stopPropagation();clearNoteUpload()" style="position:absolute;top:-8px;right:-8px;background:#c0392b;color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:14px;line-height:1;">✕</button>';
+  }
+}
+
+function clearNoteUpload() {
+  selectedNoteFile = null;
+  document.getElementById('note-file-input').value = '';
+  document.getElementById('note-upload-placeholder').style.display = 'block';
+  document.getElementById('note-upload-preview').style.display = 'none';
+  document.getElementById('note-preview-img').src = '';
+}
+
+async function uploadDoctorNote(empId, reqId, file) {
+  if (!storage || !file) return null;
+  try {
+    const ext = file.name.split('.').pop();
+    const path = 'doctor-notes/' + empId + '/' + reqId + '.' + ext;
+    const ref = storage.ref(path);
+    await ref.put(file);
+    const url = await ref.getDownloadURL();
+    return url;
+  } catch(e) {
+    console.warn('Upload error:', e);
+    return null;
+  }
+}
+
+
+// ══════════════════════════════════════════
+// ADMIN — UPLOAD DOCTOR'S NOTE
+// ══════════════════════════════════════════
+async function uploadAdminNote(input, reqId) {
+  const file = input.files[0];
+  if (!file) return;
+
+  // Check file size — Firebase DB limit is 10MB per node
+  if (file.size > 5 * 1024 * 1024) {
+    showToast('File too large. Please use an image under 5MB.', 'error');
+    return;
+  }
+
+  showToast('Uploading...', 'info');
+
+  try {
+    // Convert to base64 and store directly in Firebase DB
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    await db.ref('requests/' + reqId).update({
+      doctorNoteUrl: base64,
+      doctorNoteFile: file.name,
+      doctorNoteUploadedAt: Date.now()
+    });
+
+    showToast('✅ Doctor note uploaded!', 'success');
+    loadAdminRequests();
+  } catch(e) {
+    console.error(e);
+    showToast('Upload failed. Try again.', 'error');
+  }
+}
+
 // ══════════════════════════════════════════
 // ADMIN — LOAD DATA
 // ══════════════════════════════════════════
@@ -2038,18 +2163,36 @@ function reqAdminCard(id, r, showActions) {
   let statusInfo = '';
   if (r.status==='approved') statusInfo = '<span style="font-size:.75rem;color:var(--green)">✅ Approved '+(decidedStr?'on '+decidedStr:'')+'</span>';
   if (r.status==='rejected') statusInfo = '<span style="font-size:.75rem;color:var(--red)">❌ Rejected '+(decidedStr?'on '+decidedStr:'')+(r.rejectReason?' — "'+r.rejectReason+'"':'')+'</span>';
+  // Doctor's note badge
+  const notesBadge = r.doctorNoteUrl
+    ? '<a href="'+r.doctorNoteUrl+'" target="_blank" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;background:#e8f4ff;color:#1a6eb5;border:1px solid #9ecfff;border-radius:6px;padding:.2rem .6rem;text-decoration:none;margin-top:3px;">🏥 View Doctor\'s Note</a>'
+    : (r.doctorNoteFile ? '<span style="font-size:.75rem;color:var(--muted)">🏥 Note: '+r.doctorNoteFile+'</span>' : '');
 
   let actionBtns = '';
   const eid = id;
+  // Doctor's note upload button (always visible for sick day)
+  const noteBtn = r.type === 'sick'
+    ? (r.doctorNoteUrl
+        ? '<a href="'+r.doctorNoteUrl+'" target="_blank" class="btn btn-ghost btn-sm" style="background:#e8f4ff;color:#1a6eb5;border-color:#9ecfff;">🏥 View Note</a>'
+        : '<label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;background:#fff8e6;color:#7a5c00;border-color:#f0d060;" title="Upload doctor note">📎 Add Note<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadAdminNote(this,&quot;'+eid+'&quot;)"></label>')
+    : '';
+
   if (showActions) {
-    actionBtns = '<div style="display:flex;gap:.4rem;">' +
+    actionBtns = '<div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">' +
+      noteBtn +
       '<button class="btn btn-green btn-sm" onclick="approveRequest(&quot;'+eid+'&quot;)">Approve</button>' +
       '<button class="btn btn-red btn-sm" onclick="openReject(&quot;'+eid+'&quot;)">Reject</button>' +
     '</div>';
   } else if (r.status==='rejected') {
-    actionBtns = '<button class="btn btn-green btn-sm" onclick="changeToApproved(&quot;'+eid+'&quot;)">Change to Approved</button>';
+    actionBtns = '<div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">' + noteBtn +
+      '<button class="btn btn-green btn-sm" onclick="changeToApproved(&quot;'+eid+'&quot;)">Change to Approved</button>' +
+    '</div>';
   } else if (r.status==='approved') {
-    actionBtns = '<button class="btn btn-red btn-sm" onclick="changeToRejected(&quot;'+eid+'&quot;)">Change to Rejected</button>';
+    actionBtns = '<div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">' + noteBtn +
+      '<button class="btn btn-red btn-sm" onclick="changeToRejected(&quot;'+eid+'&quot;)">Change to Rejected</button>' +
+    '</div>';
+  } else {
+    actionBtns = noteBtn ? '<div style="display:flex;gap:.4rem;justify-content:flex-end;">'+noteBtn+'</div>' : '';
   }
 
   return '<div class="req-row-b">'+
@@ -2064,6 +2207,7 @@ function reqAdminCard(id, r, showActions) {
           (r.note?' &bull; <em>"'+r.note+'"</em>':'')+
         '</div>'+
         (statusInfo?'<div style="margin-top:3px;">'+statusInfo+'</div>':'')+
+        (notesBadge?'<div style="margin-top:4px;">'+notesBadge+'</div>':'')+
       '</div>'+
     '</div>'+
     '<div style="font-size:.78rem;color:var(--muted);white-space:nowrap;text-align:right;">'+submittedStr+'</div>'+
@@ -2081,8 +2225,8 @@ async function approveRequest(id) {
   const snap = await db.ref(`requests/${id}`).once('value');
   const req = snap.val();
   await db.ref(`requests/${id}`).update({ status: 'approved', decidedAt: Date.now() });
-  showToast('✅ Request approved','success');
-  sendSmsToEmployee(req, 'approved', '');
+  showToast('✅ Request approved — email will open to notify employee','success');
+  sendEmailToEmployee(req, 'approved', '');
   loadAdminRequests();
 }
 
@@ -2099,8 +2243,8 @@ async function confirmReject() {
   const req = snap.val();
   await db.ref(`requests/${pendingRejectId}`).update({ status: 'rejected', rejectReason: reason, decidedAt: Date.now() });
   closeModal('modal-reject');
-  showToast('Request rejected','error');
-  sendSmsToEmployee(req, 'rejected', reason);
+  showToast('Request rejected — email will open to notify employee','error');
+  sendEmailToEmployee(req, 'rejected', reason);
   loadAdminRequests();
 }
 
@@ -2113,7 +2257,8 @@ async function changeToApproved(id) {
     decidedAt: Date.now(),
     rejectReason: ''
   });
-  showToast('✅ Changed to Approved', 'success');
+  showToast('✅ Changed to Approved — email will open to notify employee', 'success');
+  sendEmailToEmployee(req, 'approved', '');
   loadAdminRequests();
 }
 
@@ -2138,7 +2283,7 @@ async function quickAddEmployee() {
   try {
     await db.ref('employees').push({
       first, last, phone: '',
-      limitVac: 10, limitSick: 5, limitPersonal: 3
+      limitVac: 10, limitSick: 5
     });
     document.getElementById('quick-first').value = '';
     document.getElementById('quick-last').value = '';
@@ -2234,7 +2379,7 @@ async function confirmImport() {
   for (const emp of importData) {
     await db.ref('employees').push({
       first: emp.first, last: emp.last, phone: '',
-      limitVac: 10, limitSick: 5, limitPersonal: 3
+      limitVac: 10, limitSick: 5
     });
     added++;
   }
@@ -2261,7 +2406,6 @@ async function loadEmployeeTable() {
       <td><span style="font-family:monospace;background:#f0f0f0;padding:.2rem .5rem;border-radius:5px;letter-spacing:.15em;font-weight:600">${e.pin||'<em style="color:#aaa;font-weight:400;font-family:sans-serif">Not set</em>'}</span></td>
       <td>${e.limitVac||0}</td>
       <td>${e.limitSick||0}</td>
-      <td>${e.limitPersonal||0}</td>
       <td>
         <button class="btn btn-ghost btn-sm" onclick="openEditEmployee('${id}')">Edit</button>
         <button class="btn btn-red btn-sm" onclick="deleteEmployee('${id}')">Del</button>
@@ -2277,7 +2421,6 @@ function openAddEmployee() {
   clearPin('mp');
   document.getElementById('modal-vac').value = 10;
   document.getElementById('modal-sick').value = 5;
-  document.getElementById('modal-personal').value = 3;
   openModal('modal-employee');
 }
 
@@ -2293,7 +2436,6 @@ async function openEditEmployee(id) {
   clearPin('mp');
   document.getElementById('modal-vac').value = e.limitVac||0;
   document.getElementById('modal-sick').value = e.limitSick||0;
-  document.getElementById('modal-personal').value = e.limitPersonal||0;
   openModal('modal-employee');
 }
 
@@ -2310,7 +2452,6 @@ async function saveEmployee() {
     first, last, phone, email,
     limitVac: parseInt(document.getElementById('modal-vac').value)||0,
     limitSick: parseInt(document.getElementById('modal-sick').value)||0,
-    limitPersonal: parseInt(document.getElementById('modal-personal').value)||0,
   };
   if (pin.length === 4) data.pin = pin;
 
@@ -2400,20 +2541,16 @@ async function renderReport() {
     // Build tooltip content
     const vacUsed     = myReqs.filter(r=>r.type==='vacation' && r.status==='approved').reduce((a,r)=>a+(r.days||1),0);
     const sickUsed    = myReqs.filter(r=>r.type==='sick'     && r.status==='approved').reduce((a,r)=>a+(r.days||1),0);
-    const persUsed    = myReqs.filter(r=>r.type==='personal' && r.status==='approved').reduce((a,r)=>a+(r.days||1),0);
     const vacLimit    = e.limitVac      || 0;
     const sickLimit   = e.limitSick     || 0;
-    const persLimit   = e.limitPersonal || 0;
     const vacLeft     = vacLimit  > 0 ? vacLimit  - vacUsed  : '∞';
     const sickLeft    = sickLimit > 0 ? sickLimit - sickUsed : '∞';
-    const persLeft    = persLimit > 0 ? persLimit - persUsed : '∞';
 
     const tooltip =
       '<div class="report-tooltip">' +
         '<div class="rtt-name">' + e.first + ' ' + e.last + '</div>' +
         '<div class="rtt-row"><span>🌴 Vacation</span><span>' + vacUsed + ' used &nbsp;·&nbsp; <b>' + vacLeft + ' left</b>' + (vacLimit>0?' / '+vacLimit:'') + '</span></div>' +
         '<div class="rtt-row"><span>🤒 Sick Days</span><span>' + sickUsed + ' used &nbsp;·&nbsp; <b>' + sickLeft + ' left</b>' + (sickLimit>0?' / '+sickLimit:'') + '</span></div>' +
-        '<div class="rtt-row"><span>🧘 Personal</span><span>' + persUsed + ' used &nbsp;·&nbsp; <b>' + persLeft + ' left</b>' + (persLimit>0?' / '+persLimit:'') + '</span></div>' +
         '<div class="rtt-total">Total used this year: <b>' + total + ' day' + (total!==1?'s':'') + '</b></div>' +
       '</div>';
 
@@ -2441,26 +2578,73 @@ function notifyManager(req) {
 }
 
 async function sendEmailToManager(req) {
-  // Get enabled manager emails
   let managers = [];
-  try { managers = JSON.parse(localStorage.getItem('admin_managers') || '[]'); } catch(e) {}
+  // Load from Firebase first for reliability
+  try {
+    if (db) {
+      const snap = await db.ref('config/admin_managers').once('value');
+      if (snap.val()) managers = snap.val();
+    }
+  } catch(e) {}
+  // Fall back to localStorage
+  if (!managers.length) {
+    try { managers = JSON.parse(localStorage.getItem('admin_managers') || '[]'); } catch(e) {}
+  }
   const activeEmails = managers.filter(m => m.enabled && m.email).map(m => m.email);
-  if (!activeEmails.length) return;
+  if (!activeEmails.length) {
+    showToast('No managers set up. Go to Settings → Admin Managers.', 'error');
+    return;
+  }
 
-  const subject = encodeURIComponent('New Time-Off Request from ' + req.employeeName);
-  const body = encodeURIComponent(
-    'Employee: ' + req.employeeName + '\n' +
-    'Type: ' + (req.typeLabel || req.type) + '\n' +
-    'Dates: ' + fmtDate(req.start) + ' to ' + fmtDate(req.end) + '\n' +
-    'Days: ' + req.days + '\n' +
-    'Note: ' + (req.note || 'None') + '\n' +
-    'Submitted: ' + new Date(req.createdAt).toLocaleString() + '\n\n' +
-    'Log in to the Admin Panel to approve or reject this request.'
-  );
+  const subject = encodeURIComponent('🗓 New Time-Off Request — ' + req.employeeName);
+  const body = encodeURIComponent([
+    'A new time-off request has been submitted.',
+    '',
+    'Employee: ' + req.employeeName,
+    'Type: ' + (req.typeLabel || req.type),
+    'Dates: ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : ''),
+    'Days: ' + req.days,
+    'Note: ' + (req.note || 'None'),
+    'Submitted: ' + new Date(req.createdAt).toLocaleString(),
+    '',
+    'Log in to the Admin Panel to approve or reject.'
+  ].join('\n'));
 
-  const to = activeEmails.join(',');
-  const mailtoLink = 'mailto:' + to + '?subject=' + subject + '&body=' + body;
-  window.open(mailtoLink, '_blank');
+  // Show email popup so user can send without leaving the app
+  // Open Gmail compose in new tab — works without a mail app installed
+  const gmailUrl = 'https://mail.google.com/mail/?view=cm&to=' + 
+    encodeURIComponent(activeEmails.join(',')) + 
+    '&su=' + subject + '&body=' + body;
+  window.open(gmailUrl, '_blank');
+}
+
+async function sendEmailToEmployee(req, decision, reason) {
+  const empEmail = req.employeeEmail || '';
+  if (!empEmail) return;
+
+  const approved = decision === 'approved';
+  const icon = approved ? '✅' : '❌';
+  const subject = encodeURIComponent(icon + ' Your ' + (req.typeLabel||req.type) + ' Request — ' + (approved ? 'Approved' : 'Not Approved'));
+  const body = encodeURIComponent([
+    'Hi ' + req.employeeName + ',',
+    '',
+    'Your time-off request has been ' + (approved ? 'APPROVED ✅' : 'NOT APPROVED ❌') + '.',
+    '',
+    'Type: ' + (req.typeLabel || req.type),
+    'Dates: ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : ''),
+    'Days: ' + req.days,
+    (reason ? 'Reason: ' + reason : ''),
+    '',
+    'Log in to the Employee Services app to see all your requests.',
+    '',
+    'Food Fair Wholesale Fresh Market'
+  ].filter(l => l !== undefined).join('\n'));
+
+  // Open Gmail compose in new tab
+  const gmailUrl = 'https://mail.google.com/mail/?view=cm&to=' + 
+    encodeURIComponent(empEmail) + 
+    '&su=' + subject + '&body=' + body;
+  window.open(gmailUrl, '_blank');
 }
 
 async function sendSmsToManager(req) {
