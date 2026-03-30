@@ -1701,6 +1701,8 @@ async function submitRequest() {
 
     await newRef.set(req);
     notifyManager(req);
+    // Send confirmation email to employee
+    sendSubmitConfirmationToEmployee(req);
     showToast('✅ Request submitted!','success');
     selectedType = null;
 
@@ -2611,6 +2613,31 @@ async function sendEmailToManager(req) {
   window.open(gmailUrl, '_blank');
 }
 
+
+async function sendSubmitConfirmationToEmployee(req) {
+  const empEmail = req.employeeEmail || currentEmployee.email || '';
+  if (!empEmail) return;
+  try {
+    if (!window.emailjs) {
+      await loadScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js');
+    }
+    emailjs.init('XmC0WkkY-M_QaYuK4');
+    await emailjs.send('service_ftsfya8', 'template_eudncnb', {
+      to_email: empEmail,
+      employee_name: req.employeeName,
+      request_type: req.typeLabel || req.type,
+      start_date: fmtDate(req.start),
+      end_date: fmtDate(req.end),
+      days: req.days,
+      note: req.note || 'None',
+      submitted_at: new Date(req.createdAt).toLocaleString() + ' — ⏳ Waiting for manager approval'
+    });
+    console.log('Confirmation sent to employee:', empEmail);
+  } catch(e) {
+    console.warn('Confirmation email error:', e);
+  }
+}
+
 async function sendEmailToEmployee(req, decision, reason) {
   const empEmail = req.employeeEmail || '';
   if (!empEmail) return;
@@ -2628,7 +2655,9 @@ async function sendEmailToEmployee(req, decision, reason) {
       start_date: fmtDate(req.start),
       end_date: fmtDate(req.end),
       days: req.days,
-      note: approved ? 'Your request has been APPROVED ✅' : 'Your request was NOT approved ❌' + (reason ? '. Reason: ' + reason : ''),
+      note: approved 
+        ? '✅ Your request has been APPROVED. Enjoy your time off!' 
+        : '❌ Your request was NOT approved.' + (reason ? ' Reason: ' + reason : ' Please speak with your manager.'),
       submitted_at: new Date(req.createdAt).toLocaleString()
     });
     console.log('Employee notification sent to', empEmail);
