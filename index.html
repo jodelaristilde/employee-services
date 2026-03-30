@@ -813,6 +813,10 @@
     <h1>🏪 Admin Panel</h1>
     <div class="header-right">
       <span class="text-muted" style="font-size:.82rem;">Manager View</span>
+      <div id="notif-bell" style="position:relative;cursor:pointer;display:none;" onclick="switchAdmin('admin-requests')" title="New requests waiting">
+        <span style="font-size:1.4rem;">🔔</span>
+        <span id="notif-count-badge" style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;">0</span>
+      </div>
       <button class="btn btn-ghost btn-sm" onclick="logout('screen-landing')">Sign Out</button>
     </div>
   </div>
@@ -912,7 +916,7 @@
         <div class="card" style="margin-bottom:1rem">
           <div class="card-title">📧 Email Notifications</div>
           <div class="config-banner" style="margin-bottom:0;">
-            When an employee submits a request, the app will open your email with everything filled in — just hit <strong>Send</strong>. No extra setup needed. Add your managers below and make sure their emails are correct.
+            Emails are sent automatically and silently when employees submit requests. Add your managers below — make sure their email is correct and status is <strong>✅ Enabled</strong>. <button class="btn btn-ghost btn-sm" style="margin-left:.5rem" onclick="testEmailNotification()">📧 Send Test Email</button>
           </div>
         </div>
 
@@ -2119,6 +2123,24 @@ async function uploadAdminNote(input, reqId) {
   }
 }
 
+
+function testEmailNotification() {
+  const managers = adminManagers.filter(m => m.enabled && m.email);
+  if (!managers.length) { showToast('No enabled managers found. Add a manager with email first.', 'error'); return; }
+  const testReq = {
+    employeeName: 'Test Employee',
+    typeLabel: 'Vacation',
+    type: 'vacation',
+    start: '2026-04-01',
+    end: '2026-04-03',
+    days: 3,
+    note: 'This is a test notification',
+    createdAt: Date.now()
+  };
+  sendEmailToManager(testReq);
+  showToast('Test email sent to ' + managers.map(m=>m.email).join(', '), 'success');
+}
+
 // ══════════════════════════════════════════
 // ADMIN — LOAD DATA
 // ══════════════════════════════════════════
@@ -2150,6 +2172,7 @@ async function loadAdminRequests() {
   const header = '<div class="req-row-b req-row-header"><div>Employee</div><div style="text-align:right">Submitted</div><div style="text-align:right">Actions</div></div>';
   pending.innerHTML = pendingItems.length ? header + pendingItems.map(([id,r]) => reqAdminCard(id,r,true)).join('') : '<div class="empty-state">No pending requests 🎉</div>';
   all.innerHTML = allItems.length ? header + allItems.map(([id,r]) => reqAdminCard(id,r,false)).join('') : '<div class="empty-state">No processed requests yet.</div>';
+  updateNotifBell();
 }
 
 function reqAdminCard(id, r, showActions) {
@@ -2474,10 +2497,23 @@ async function saveEmployee() {
 }
 
 async function deleteEmployee(id) {
-  if (!confirm('Delete this employee? Their requests will remain.')) return;
-  await db.ref(`employees/${id}`).remove();
-  showToast('Employee removed','info');
-  loadEmployeeTable();
+  if (!confirm('Delete this employee? This will also delete ALL their requests permanently.')) return;
+  try {
+    // Delete employee
+    await db.ref('employees/' + id).remove();
+    // Delete all their requests
+    const snap = await db.ref('requests').orderByChild('employeeId').equalTo(id).once('value');
+    const reqs = snap.val();
+    if (reqs) {
+      const deletes = Object.keys(reqs).map(reqId => db.ref('requests/' + reqId).remove());
+      await Promise.all(deletes);
+    }
+    showToast('Employee and all their requests deleted.', 'info');
+    loadEmployeeTable();
+    loadAdminRequests();
+  } catch(e) {
+    showToast('Error deleting. Try again.', 'error');
+  }
 }
 
 // ══════════════════════════════════════════
@@ -2634,13 +2670,13 @@ function startRequestPoller() {
           (r.typeLabel||r.type) + ' · ' + fmtDate(r.start) + (r.end !== r.start ? ' → ' + fmtDate(r.end) : '') + ' (' + r.days + ' day' + (r.days>1?'s':'') + ')',
           r
         );
-        // Update tab title with count
         document.title = '🔔 New Request! — Admin Panel';
         setTimeout(() => { document.title = 'Food Fair Employee Services'; }, 10000);
       });
       if (newReqs.length) {
         lastSeenRequestTime = Math.max(...newReqs.map(r => r.createdAt));
         loadAdminRequests();
+        updateNotifBell();
       }
     } catch(e) {}
   }, 15000);
@@ -2648,6 +2684,24 @@ function startRequestPoller() {
 
 function stopRequestPoller() {
   if (notifPoller) { clearInterval(notifPoller); notifPoller = null; }
+}
+
+
+function updateNotifBell() {
+  if (!db) return;
+  db.ref('requests').orderByChild('status').equalTo('pending').once('value').then(snap => {
+    const count = snap.val() ? Object.keys(snap.val()).length : 0;
+    const bell = document.getElementById('notif-bell');
+    const badge = document.getElementById('notif-count-badge');
+    if (bell && badge) {
+      if (count > 0) {
+        bell.style.display = 'block';
+        badge.textContent = count;
+      } else {
+        bell.style.display = 'none';
+      }
+    }
+  }).catch(()=>{});
 }
 
 function sendPushNotification(req) {
