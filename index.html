@@ -2584,29 +2584,34 @@ let notifPoller = null;
 let lastSeenRequestTime = Date.now();
 
 async function requestNotificationPermission() {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    const perm = await Notification.requestPermission();
-    if (perm === 'granted') {
-      showDesktopNotif('✅ Notifications enabled!', 'You will be alerted instantly when employees submit requests.');
+  try {
+    if (!('Notification' in window)) { startRequestPoller(); return; }
+    if (Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        showDesktopNotif('✅ Notifications enabled!', 'You will be alerted instantly when employees submit requests.');
+      }
     }
-  }
+  } catch(e) { console.warn('Notification permission error:', e); }
   startRequestPoller();
 }
 
 function showDesktopNotif(title, body, req) {
-  if (Notification.permission !== 'granted') return;
-  const n = new Notification(title, {
-    body: body,
-    icon: 'https://img.icons8.com/color/48/food.png',
-    requireInteraction: true,
-    tag: 'foodfair-' + Date.now()
-  });
-  n.onclick = function() {
-    window.focus();
-    n.close();
-    if (req) switchAdmin('admin-requests');
-  };
+  try {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    const n = new Notification(title, {
+      body: body,
+      icon: 'https://img.icons8.com/color/48/food.png',
+      requireInteraction: true,
+      tag: 'foodfair-' + Date.now()
+    });
+    n.onclick = function() {
+      window.focus();
+      n.close();
+      if (req) switchAdmin('admin-requests');
+    };
+  } catch(e) { console.warn('Notification not supported:', e); }
 }
 
 function startRequestPoller() {
@@ -2646,12 +2651,16 @@ function stopRequestPoller() {
 }
 
 function sendPushNotification(req) {
-  showDesktopNotif(
-    '🗓 New Request — ' + req.employeeName,
-    (req.typeLabel||req.type) + ' · ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : '') + ' (' + req.days + ' day' + (req.days>1?'s':'') + ')'
-  );
-  document.title = '🔔 New Request! — Admin Panel';
-  setTimeout(() => { document.title = 'Food Fair Employee Services'; }, 10000);
+  try {
+    showDesktopNotif(
+      '🗓 New Request — ' + req.employeeName,
+      (req.typeLabel||req.type) + ' · ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : '') + ' (' + req.days + ' day' + (req.days>1?'s':'') + ')'
+    );
+    if (typeof document !== 'undefined') {
+      document.title = '🔔 New Request! — Admin Panel';
+      setTimeout(() => { document.title = 'Food Fair Employee Services'; }, 10000);
+    }
+  } catch(e) { console.warn('Push notification error:', e); }
 }
 
 // ══════════════════════════════════════════
