@@ -1396,9 +1396,12 @@ function switchTab(targetId, group) {
 
 function switchAdmin(id) {
   document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
+  const section = document.getElementById(id);
+  if (section) section.classList.add('active');
   document.querySelectorAll('.admin-nav-item').forEach(n => n.classList.remove('active'));
-  event.currentTarget.classList.add('active');
+  // Highlight the correct nav item
+  const navItems = document.querySelectorAll('.admin-nav-item');
+  navItems.forEach(n => { if (n.getAttribute('onclick') && n.getAttribute('onclick').includes(id)) n.classList.add('active'); });
   if (id === 'admin-report') renderReport();
 }
 
