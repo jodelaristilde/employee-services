@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI2MwMzkyYiIgc3Ryb2tlPSIjOGUxYTBlIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzOCIgZmlsbD0id2hpdGUiIG9wYWNpdHk9IjAuMTUiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzIiBmaWxsPSJ3aGl0ZSIvPgogIDwhLS0gSG91ciBoYW5kIC0gcG9pbnRpbmcgdG8gMTAgLS0+CiAgPGxpbmUgeDE9IjUwIiB5MT0iNTAiIHgyPSIzMCIgeTI9IjI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwhLS0gTWludXRlIGhhbmQgLSBwb2ludGluZyB0byAxMiAtLT4KICA8bGluZSB4MT0iNTAiIHkxPSI1MCIgeDI9IjUwIiB5Mj0iMTgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMy41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8IS0tIEhvdXIgbWFya3MgLS0+CiAgPGxpbmUgeDE9IjUwIiB5MT0iMTIiIHgyPSI1MCIgeTI9IjIwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxsaW5lIHgxPSI1MCIgeTE9IjgwIiB4Mj0iNTAiIHkyPSI4OCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8bGluZSB4MT0iMTIiIHkxPSI1MCIgeDI9IjIwIiB5Mj0iNTAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGxpbmUgeDE9IjgwIiB5MT0iNTAiIHgyPSI4OCIgeTI9IjUwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4=">
 <meta name="theme-color" content="#c0392b">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,7 +22,7 @@
 }">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Food Fair Employee Services</title>
+<title>⏰ Food Fair Staff</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -753,7 +754,7 @@
 <!-- ══ EMPLOYEE DASHBOARD ══ -->
 <div id="screen-employee" class="screen">
   <div class="app-header">
-    <h1>🏪 Employee Services</h1>
+    <h1>⏰ Employee Services</h1>
     <div class="header-right">
       <span id="emp-greeting"></span>
       <button id="btn-signout" class="btn btn-ghost btn-sm" onclick="logout('screen-login')">Sign Out</button>
@@ -846,10 +847,11 @@
 <!-- ══ ADMIN PANEL ══ -->
 <div id="screen-admin" class="screen">
   <div class="app-header">
-    <h1>🏪 Admin Panel</h1>
+    <h1>⏰ Admin Panel</h1>
     <div class="header-right">
       <span class="text-muted" style="font-size:.82rem;">Manager View</span>
       <button id="install-btn" style="display:none;padding:.3rem .8rem;border-radius:8px;border:1px solid var(--accent);background:#fff8f8;color:var(--accent);cursor:pointer;font-size:.78rem;font-weight:600;" onclick="installApp()">📲 Install App</button>
+      <button onclick="testDesktopNotif()" style="padding:.3rem .8rem;border-radius:8px;border:1px solid #888;background:#f5f5f5;color:#444;cursor:pointer;font-size:.78rem;" title="Test desktop popup">🔔 Test Popup</button>
       <div id="notif-bell" style="position:relative;cursor:pointer;display:none;" onclick="switchAdmin('admin-requests')" title="New requests waiting">
         <span style="font-size:1.4rem;">🔔</span>
         <span id="notif-count-badge" style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;">0</span>
@@ -2813,6 +2815,38 @@ async function renderReport() {
 
 
 
+
+function testDesktopNotif() {
+  if (!('Notification' in window)) {
+    showToast('Your browser does not support notifications.', 'error');
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    showToast('Notifications are BLOCKED. Click the lock icon in the address bar → Notifications → Allow → Refresh.', 'error');
+    return;
+  }
+  if (Notification.permission === 'default') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') testDesktopNotif();
+      else showToast('Please click Allow when the browser asks for notification permission.', 'error');
+    });
+    return;
+  }
+  // Permission is granted - show test notification
+  try {
+    const n = new Notification('⏰ Test — New Request!', {
+      body: 'Maria Garcia requested Vacation\nApril 15 → April 17 (3 days)',
+      icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI2MwMzkyYiIgc3Ryb2tlPSIjOGUxYTBlIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzOCIgZmlsbD0id2hpdGUiIG9wYWNpdHk9IjAuMTUiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzIiBmaWxsPSJ3aGl0ZSIvPgogIDwhLS0gSG91ciBoYW5kIC0gcG9pbnRpbmcgdG8gMTAgLS0+CiAgPGxpbmUgeDE9IjUwIiB5MT0iNTAiIHgyPSIzMCIgeTI9IjI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwhLS0gTWludXRlIGhhbmQgLSBwb2ludGluZyB0byAxMiAtLT4KICA8bGluZSB4MT0iNTAiIHkxPSI1MCIgeDI9IjUwIiB5Mj0iMTgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMy41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8IS0tIEhvdXIgbWFya3MgLS0+CiAgPGxpbmUgeDE9IjUwIiB5MT0iMTIiIHgyPSI1MCIgeTI9IjIwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxsaW5lIHgxPSI1MCIgeTE9IjgwIiB4Mj0iNTAiIHkyPSI4OCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8bGluZSB4MT0iMTIiIHkxPSI1MCIgeDI9IjIwIiB5Mj0iNTAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGxpbmUgeDE9IjgwIiB5MT0iNTAiIHgyPSI4OCIgeTI9IjUwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4=',
+      requireInteraction: true,
+      tag: 'test-' + Date.now()
+    });
+    n.onclick = function() { window.focus(); n.close(); };
+    showToast('✅ Popup sent! Check your Windows notification area.', 'success');
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+}
+
 // ══════════════════════════════════════════
 // PWA INSTALL
 // ══════════════════════════════════════════
@@ -2852,25 +2886,46 @@ let notifPoller = null;
 let lastSeenRequestTime = Date.now();
 
 async function requestNotificationPermission() {
+  startRequestPoller();
   try {
-    if (!('Notification' in window)) { startRequestPoller(); return; }
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') {
+      // Already granted - show confirmation
+      new Notification('⏰ Food Fair Staff', {
+        body: 'Notifications active. You will be alerted when employees submit requests.',
+        icon: 'https://img.icons8.com/emoji/48/alarm-clock-emoji.png'
+      });
+      return;
+    }
     if (Notification.permission === 'default') {
       const perm = await Notification.requestPermission();
       if (perm === 'granted') {
-        showDesktopNotif('✅ Notifications enabled!', 'You will be alerted instantly when employees submit requests.');
+        new Notification('⏰ Food Fair Staff', {
+          body: 'Notifications enabled! You will get alerts when employees submit requests.',
+          icon: 'https://img.icons8.com/emoji/48/alarm-clock-emoji.png'
+        });
+      } else {
+        showToast('⚠️ Please allow notifications in your browser settings to get alerts.', 'error');
       }
     }
-  } catch(e) { console.warn('Notification permission error:', e); }
-  startRequestPoller();
+  } catch(e) { console.warn('Notification error:', e); }
 }
 
 function showDesktopNotif(title, body, req) {
   try {
-    if (!('Notification' in window)) return;
-    if (Notification.permission !== 'granted') return;
+    if (!('Notification' in window)) { console.log('Notifications not supported'); return; }
+    console.log('Notification permission:', Notification.permission);
+    if (Notification.permission === 'denied') { console.log('Notifications denied by user'); return; }
+    if (Notification.permission !== 'granted') {
+      // Try to request permission
+      Notification.requestPermission().then(p => {
+        if (p === 'granted') showDesktopNotif(title, body, req);
+      });
+      return;
+    }
     const n = new Notification(title, {
       body: body,
-      icon: 'https://img.icons8.com/color/48/food.png',
+      icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iI2MwMzkyYiIgc3Ryb2tlPSIjOGUxYTBlIiBzdHJva2Utd2lkdGg9IjMiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzOCIgZmlsbD0id2hpdGUiIG9wYWNpdHk9IjAuMTUiLz4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSIzIiBmaWxsPSJ3aGl0ZSIvPgogIDwhLS0gSG91ciBoYW5kIC0gcG9pbnRpbmcgdG8gMTAgLS0+CiAgPGxpbmUgeDE9IjUwIiB5MT0iNTAiIHgyPSIzMCIgeTI9IjI1IiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDwhLS0gTWludXRlIGhhbmQgLSBwb2ludGluZyB0byAxMiAtLT4KICA8bGluZSB4MT0iNTAiIHkxPSI1MCIgeDI9IjUwIiB5Mj0iMTgiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMy41IiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8IS0tIEhvdXIgbWFya3MgLS0+CiAgPGxpbmUgeDE9IjUwIiB5MT0iMTIiIHgyPSI1MCIgeTI9IjIwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogIDxsaW5lIHgxPSI1MCIgeTE9IjgwIiB4Mj0iNTAiIHkyPSI4OCIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8bGluZSB4MT0iMTIiIHkxPSI1MCIgeDI9IjIwIiB5Mj0iNTAiIHN0cm9rZT0id2hpdGUiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGxpbmUgeDE9IjgwIiB5MT0iNTAiIHgyPSI4OCIgeTI9IjUwIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4=',
       requireInteraction: true,
       tag: 'foodfair-' + Date.now()
     });
@@ -2879,7 +2934,8 @@ function showDesktopNotif(title, body, req) {
       n.close();
       if (req) switchAdmin('admin-requests');
     };
-  } catch(e) { console.warn('Notification not supported:', e); }
+    console.log('Desktop notification shown:', title);
+  } catch(e) { console.warn('Notification error:', e); }
 }
 
 function startRequestPoller() {
