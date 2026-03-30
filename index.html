@@ -2616,28 +2616,25 @@ async function sendEmailToEmployee(req, decision, reason) {
   if (!empEmail) return;
 
   const approved = decision === 'approved';
-  const icon = approved ? '✅' : '❌';
-  const subject = encodeURIComponent(icon + ' Your ' + (req.typeLabel||req.type) + ' Request — ' + (approved ? 'Approved' : 'Not Approved'));
-  const body = encodeURIComponent([
-    'Hi ' + req.employeeName + ',',
-    '',
-    'Your time-off request has been ' + (approved ? 'APPROVED ✅' : 'NOT APPROVED ❌') + '.',
-    '',
-    'Type: ' + (req.typeLabel || req.type),
-    'Dates: ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : ''),
-    'Days: ' + req.days,
-    (reason ? 'Reason: ' + reason : ''),
-    '',
-    'Log in to the Employee Services app to see all your requests.',
-    '',
-    'Food Fair Wholesale Fresh Market'
-  ].filter(l => l !== undefined).join('\n'));
-
-  // Open Gmail compose in new tab
-  const gmailUrl = 'https://mail.google.com/mail/?view=cm&to=' + 
-    encodeURIComponent(empEmail) + 
-    '&su=' + subject + '&body=' + body;
-  window.open(gmailUrl, '_blank');
+  try {
+    if (!window.emailjs) {
+      await loadScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js');
+    }
+    emailjs.init('XmC0WkkY-M_QaYuK4');
+    await emailjs.send('service_ftsfya8', 'template_eudncnb', {
+      to_email: empEmail,
+      employee_name: req.employeeName,
+      request_type: req.typeLabel || req.type,
+      start_date: fmtDate(req.start),
+      end_date: fmtDate(req.end),
+      days: req.days,
+      note: approved ? 'Your request has been APPROVED ✅' : 'Your request was NOT approved ❌' + (reason ? '. Reason: ' + reason : ''),
+      submitted_at: new Date(req.createdAt).toLocaleString()
+    });
+    console.log('Employee notification sent to', empEmail);
+  } catch(e) {
+    console.warn('EmailJS employee error:', e);
+  }
 }
 
 async function sendSmsToManager(req) {
