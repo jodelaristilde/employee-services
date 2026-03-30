@@ -759,15 +759,33 @@
           <div class="type-card" id="type-sick" onclick="selectType('sick')"><span class="icon">🤒</span><span id="type-sick-lbl">Sick Day</span></div>
           
         </div>
-        <div class="row">
-          <div class="field">
-            <label id="label-start-date">Start Date</label>
-            <input type="date" id="req-start" onchange="onStartDateChange(this.value)">
+        <div class="field">
+          <label id="label-start-date" style="margin-bottom:.5rem;display:block;">Select Date Range</label>
+          <div id="range-calendar-wrap" style="background:#fafafa;border:1px solid var(--border);border-radius:12px;padding:1rem;user-select:none;">
+            <!-- Calendar header -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
+              <button type="button" onclick="calPrevMonth()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--accent);padding:.2rem .5rem;">‹</button>
+              <span id="cal-month-label" style="font-weight:600;font-size:.95rem;"></span>
+              <button type="button" onclick="calNextMonth()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--accent);padding:.2rem .5rem;">›</button>
+            </div>
+            <!-- Day headers -->
+            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Su</div>
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Mo</div>
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Tu</div>
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">We</div>
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Th</div>
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Fr</div>
+              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Sa</div>
+            </div>
+            <!-- Calendar days grid -->
+            <div id="cal-days-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
+            <!-- Selected range display -->
+            <div id="cal-range-display" style="margin-top:.75rem;font-size:.82rem;color:var(--muted);text-align:center;min-height:1.2rem;"></div>
           </div>
-          <div class="field">
-            <label id="label-end-date">End Date</label>
-            <input type="date" id="req-end">
-          </div>
+          <!-- Hidden inputs for form submission -->
+          <input type="hidden" id="req-start">
+          <input type="hidden" id="req-end">
         </div>
         <div class="field">
           <label id="label-note">Note (optional)</label>
@@ -1356,6 +1374,137 @@ function safeAttr(id, attr, val) { const el = document.getElementById(id); if (e
 
 
 
+
+// ══════════════════════════════════════════
+// INLINE DATE RANGE CALENDAR
+// ══════════════════════════════════════════
+let calYear, calMonth, calStartDate, calEndDate, calSelecting;
+
+function calInit() {
+  const now = new Date();
+  calYear = now.getFullYear();
+  calMonth = now.getMonth();
+  calStartDate = null;
+  calEndDate = null;
+  calSelecting = 'start';
+  calRender();
+}
+
+function calPrevMonth() {
+  calMonth--;
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  calRender();
+}
+
+function calNextMonth() {
+  calMonth++;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  calRender();
+}
+
+function calRender() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('cal-month-label').textContent = months[calMonth] + ' ' + calYear;
+
+  const grid = document.getElementById('cal-days-grid');
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  let html = '';
+  // Empty cells before first day
+  for (let i = 0; i < firstDay; i++) {
+    html += '<div></div>';
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(calYear, calMonth, d);
+    const dateStr = calYear + '-' + String(calMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const isPast = date < today;
+    const isStart = calStartDate === dateStr;
+    const isEnd = calEndDate === dateStr;
+    const isInRange = calStartDate && calEndDate && dateStr > calStartDate && dateStr < calEndDate;
+    const isToday = date.toDateString() === today.toDateString();
+
+    let bg = 'transparent';
+    let color = isPast ? '#ccc' : 'var(--text)';
+    let fw = 'normal';
+    let br = '50%';
+
+    if (isStart || isEnd) { bg = 'var(--accent)'; color = '#fff'; fw = '600'; }
+    else if (isInRange) { bg = '#fde8e8'; color = 'var(--accent)'; br = '0'; }
+    if (isToday && !isStart && !isEnd) { fw = '700'; }
+
+    html += '<div data-date="' + dateStr + '" onclick="calSelectDay(this.dataset.date)" style="' +
+      'text-align:center;padding:.35rem .2rem;border-radius:' + br + ';' +
+      'background:' + bg + ';color:' + color + ';font-weight:' + fw + ';' +
+      'font-size:.85rem;cursor:' + (isPast ? 'default' : 'pointer') + ';' +
+      'transition:background .15s;' +
+      (!isPast ? 'hover:background:#f0f0f0;' : '') +
+      '">' + d + '</div>';
+  }
+
+  grid.innerHTML = html;
+  calUpdateDisplay();
+}
+
+function calSelectDay(dateStr) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const selected = new Date(dateStr);
+  if (selected < today) return; // Can't select past dates
+
+  if (!calStartDate || calSelecting === 'start' || (calStartDate && calEndDate)) {
+    // Start fresh
+    calStartDate = dateStr;
+    calEndDate = null;
+    calSelecting = 'end';
+  } else {
+    // Selecting end date
+    if (dateStr < calStartDate) {
+      // If clicked before start, make it the new start
+      calEndDate = calStartDate;
+      calStartDate = dateStr;
+    } else {
+      calEndDate = dateStr;
+    }
+    calSelecting = 'start';
+  }
+
+  // Update hidden inputs
+  document.getElementById('req-start').value = calStartDate || '';
+  document.getElementById('req-end').value = calEndDate || calStartDate || '';
+
+  calRender();
+}
+
+function calUpdateDisplay() {
+  const display = document.getElementById('cal-range-display');
+  if (!display) return;
+  if (calStartDate && calEndDate) {
+    const days = Math.round((new Date(calEndDate) - new Date(calStartDate)) / 86400000) + 1;
+    display.textContent = fmtDate(calStartDate) + ' → ' + fmtDate(calEndDate) + ' (' + days + ' day' + (days>1?'s':'') + ')';
+    display.style.color = 'var(--accent)';
+    display.style.fontWeight = '600';
+  } else if (calStartDate) {
+    display.textContent = fmtDate(calStartDate) + ' — now tap the end date';
+    display.style.color = 'var(--muted)';
+    display.style.fontWeight = 'normal';
+  } else {
+    display.textContent = 'Tap a start date';
+    display.style.color = 'var(--muted)';
+    display.style.fontWeight = 'normal';
+  }
+}
+
+function calClear() {
+  calStartDate = null;
+  calEndDate = null;
+  calSelecting = 'start';
+  document.getElementById('req-start').value = '';
+  document.getElementById('req-end').value = '';
+  calRender();
+}
+
 // ══════════════════════════════════════════
 // DATE HELPERS
 // ══════════════════════════════════════════
@@ -1396,6 +1545,7 @@ function switchTab(targetId, group) {
   tabs.forEach((t,i) => { if(contents[i]) t.classList.toggle('active', contents[i].id === targetId); });
   if (targetId === 'tab-history') loadEmpRequests();
   if (targetId === 'tab-balance') renderBalance();
+  if (targetId === 'tab-request') { calInit(); }
   if (targetId === 'tab-profile') loadProfile();
 }
 
@@ -1713,9 +1863,8 @@ async function submitRequest() {
     showToast('✅ Request submitted!','success');
     selectedType = null;
     document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
-    document.getElementById('req-start').value = '';
-    document.getElementById('req-end').value = '';
     document.getElementById('req-note').value = '';
+    calInit();
   } catch(e) {
     console.error('Submit error:', e);
     showToast('Error: ' + (e.message || 'Could not submit. Check your connection.'),'error');
@@ -1816,6 +1965,7 @@ function loadEmployeeData() {
   loadEmpRequests();
   renderBalance();
   checkNewDecisions();
+  calInit();
 }
 
 async function checkNewDecisions() {
