@@ -1635,6 +1635,7 @@ function adminLogin() {
   document.getElementById('admin-pass').value = '';
   initFirebase();
   showScreen('screen-admin');
+  requestNotificationPermission();
 }
 
 // ══════════════════════════════════════════
@@ -1701,6 +1702,7 @@ async function submitRequest() {
 
     await newRef.set(req);
     notifyManager(req);
+    sendPushNotification(req);
     // Send confirmation email to employee
     sendSubmitConfirmationToEmployee(req);
     showToast('✅ Request submitted!','success');
@@ -2562,6 +2564,51 @@ async function renderReport() {
   }).join('');
 
   content.innerHTML = '<div class="report-name-list">' + rows + '</div>';
+}
+
+
+// ══════════════════════════════════════════
+// BROWSER PUSH NOTIFICATION TO ADMIN
+// ══════════════════════════════════════════
+async function sendPushNotification(req) {
+  try {
+    // Request permission if not granted
+    if (Notification.permission === 'default') {
+      await Notification.requestPermission();
+    }
+    if (Notification.permission === 'granted') {
+      const n = new Notification('🗓 New Time-Off Request', {
+        body: req.employeeName + ' requested ' + (req.typeLabel||req.type) + '\n' +
+              fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : '') + 
+              ' (' + req.days + ' day' + (req.days>1?'s':'') + ')',
+        icon: 'https://foodfair-employee.vercel.app/favicon.ico',
+        tag: 'timeoff-' + Date.now(),
+        requireInteraction: true
+      });
+      n.onclick = function() {
+        window.focus();
+        n.close();
+      };
+    }
+  } catch(e) {
+    console.warn('Push notification error:', e);
+  }
+}
+
+// Ask admin for notification permission when they log in
+function requestNotificationPermission() {
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          new Notification('✅ Food Fair Employee Services', {
+            body: 'You will now receive instant alerts when employees submit requests.',
+            requireInteraction: false
+          });
+        }
+      });
+    }, 1000);
+  }
 }
 
 // ══════════════════════════════════════════
