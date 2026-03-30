@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
 <style>
   :root {
     --bg: #f5f5f5;
@@ -1378,7 +1379,7 @@ function showScreen(id) {
   if (id === 'screen-login') { backToStep1(); document.getElementById('emp-first').value=''; document.getElementById('emp-last').value=''; }
 }
 
-function logout(dest) { currentEmployee = null; showScreen(dest); }
+function logout(dest) { currentEmployee = null; stopRequestPoller(); showScreen(dest); }
 
 // ══════════════════════════════════════════
 // TABS
@@ -2568,47 +2569,80 @@ async function renderReport() {
 
 
 // ══════════════════════════════════════════
-// BROWSER PUSH NOTIFICATION TO ADMIN
+// DESKTOP NOTIFICATIONS + POLLING
 // ══════════════════════════════════════════
-async function sendPushNotification(req) {
-  try {
-    // Request permission if not granted
-    if (Notification.permission === 'default') {
-      await Notification.requestPermission();
+let notifPoller = null;
+let lastSeenRequestTime = Date.now();
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'default') {
+    const perm = await Notification.requestPermission();
+    if (perm === 'granted') {
+      showDesktopNotif('✅ Notifications enabled!', 'You will be alerted instantly when employees submit requests.');
     }
-    if (Notification.permission === 'granted') {
-      const n = new Notification('🗓 New Time-Off Request', {
-        body: req.employeeName + ' requested ' + (req.typeLabel||req.type) + '\n' +
-              fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : '') + 
-              ' (' + req.days + ' day' + (req.days>1?'s':'') + ')',
-        icon: 'https://foodfair-employee.vercel.app/favicon.ico',
-        tag: 'timeoff-' + Date.now(),
-        requireInteraction: true
-      });
-      n.onclick = function() {
-        window.focus();
-        n.close();
-      };
-    }
-  } catch(e) {
-    console.warn('Push notification error:', e);
   }
+  startRequestPoller();
 }
 
-// Ask admin for notification permission when they log in
-function requestNotificationPermission() {
-  if ('Notification' in window && Notification.permission === 'default') {
-    setTimeout(() => {
-      Notification.requestPermission().then(perm => {
-        if (perm === 'granted') {
-          new Notification('✅ Food Fair Employee Services', {
-            body: 'You will now receive instant alerts when employees submit requests.',
-            requireInteraction: false
-          });
-        }
+function showDesktopNotif(title, body, req) {
+  if (Notification.permission !== 'granted') return;
+  const n = new Notification(title, {
+    body: body,
+    icon: 'https://img.icons8.com/color/48/food.png',
+    requireInteraction: true,
+    tag: 'foodfair-' + Date.now()
+  });
+  n.onclick = function() {
+    window.focus();
+    n.close();
+    if (req) switchAdmin('admin-requests');
+  };
+}
+
+function startRequestPoller() {
+  if (notifPoller) clearInterval(notifPoller);
+  lastSeenRequestTime = Date.now();
+  // Poll every 15 seconds for new requests
+  notifPoller = setInterval(async () => {
+    if (!db) return;
+    try {
+      const snap = await db.ref('requests')
+        .orderByChild('createdAt')
+        .startAt(lastSeenRequestTime + 1)
+        .once('value');
+      const reqs = snap.val();
+      if (!reqs) return;
+      const newReqs = Object.values(reqs).filter(r => r.status === 'pending');
+      newReqs.forEach(r => {
+        showDesktopNotif(
+          '🗓 New Request — ' + r.employeeName,
+          (r.typeLabel||r.type) + ' · ' + fmtDate(r.start) + (r.end !== r.start ? ' → ' + fmtDate(r.end) : '') + ' (' + r.days + ' day' + (r.days>1?'s':'') + ')',
+          r
+        );
+        // Update tab title with count
+        document.title = '🔔 New Request! — Admin Panel';
+        setTimeout(() => { document.title = 'Food Fair Employee Services'; }, 10000);
       });
-    }, 1000);
-  }
+      if (newReqs.length) {
+        lastSeenRequestTime = Math.max(...newReqs.map(r => r.createdAt));
+        loadAdminRequests();
+      }
+    } catch(e) {}
+  }, 15000);
+}
+
+function stopRequestPoller() {
+  if (notifPoller) { clearInterval(notifPoller); notifPoller = null; }
+}
+
+function sendPushNotification(req) {
+  showDesktopNotif(
+    '🗓 New Request — ' + req.employeeName,
+    (req.typeLabel||req.type) + ' · ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : '') + ' (' + req.days + ' day' + (req.days>1?'s':'') + ')'
+  );
+  document.title = '🔔 New Request! — Admin Panel';
+  setTimeout(() => { document.title = 'Food Fair Employee Services'; }, 10000);
 }
 
 // ══════════════════════════════════════════
@@ -2665,23 +2699,21 @@ async function sendSubmitConfirmationToEmployee(req) {
   const empEmail = req.employeeEmail || currentEmployee.email || '';
   if (!empEmail) return;
   try {
-    if (!window.emailjs) {
-      await loadScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js');
-    }
+    if (!window.emailjs) await loadScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js');
     emailjs.init('XmC0WkkY-M_QaYuK4');
-    await emailjs.send('service_ftsfya8', 'template_eudncnb', {
+    const result = await emailjs.send('service_ftsfya8', 'template_eudncnb', {
       to_email: empEmail,
       employee_name: req.employeeName,
       request_type: req.typeLabel || req.type,
       start_date: fmtDate(req.start),
       end_date: fmtDate(req.end),
-      days: req.days,
+      days: String(req.days),
       note: req.note || 'None',
-      submitted_at: new Date(req.createdAt).toLocaleString() + ' — ⏳ Waiting for manager approval'
+      submitted_at: new Date(req.createdAt).toLocaleString() + ' — Status: Waiting for approval'
     });
-    console.log('Confirmation sent to employee:', empEmail);
+    console.log('Confirmation sent to employee:', empEmail, result);
   } catch(e) {
-    console.warn('Confirmation email error:', e);
+    console.error('Confirmation email error:', e);
   }
 }
 
