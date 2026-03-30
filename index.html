@@ -1538,7 +1538,7 @@ function calUpdateBoxes() {
 
   if (calEnd) {
     const days = Math.round((new Date(calEnd)-new Date(calStart))/86400000)+1;
-    endTxt.textContent = fmtDate(calEnd) + ' · ' + days + ' day' + (days>1?'s':'');
+    endTxt.innerHTML = fmtDate(calEnd) + '<br><span style="font-size:.78rem;color:var(--accent);font-weight:700;">' + days + ' day' + (days>1?'s':'') + '</span>';
     endTxt.style.color = '#222';
     if (endBox) endBox.style.borderColor = '#c0392b';
   } else {
