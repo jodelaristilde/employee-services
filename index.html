@@ -1656,65 +1656,66 @@ async function submitRequest() {
   if (!start || !end) { showToast('Please select start and end dates.','error'); return; }
   if (end < start) { showToast('End date must be after start date.','error'); return; }
 
-  // Count days
-  const days = Math.round((new Date(end)-new Date(start))/(86400000))+1;
+  // Make sure Firebase is connected
+  if (!db) { initFirebase(); }
+  if (!db) { showToast('Not connected. Please refresh and try again.','error'); return; }
 
-  // Check limit
+  const days = Math.round((new Date(end)-new Date(start))/(86400000))+1;
   const emp = currentEmployee;
-  const limitKey = {vacation:'limitVac',sick:'limitSick',callout:'limitCall',personal:'limitPersonal'}[selectedType];
-  const usedKey = {vacation:'usedVac',sick:'usedSick',callout:'usedCall',personal:'usedPersonal'}[selectedType];
+  const limitKey = {vacation:'limitVac', sick:'limitSick'}[selectedType];
   const limit = parseInt(emp[limitKey] || 0);
   const year = new Date(start).getFullYear();
 
   if (limit > 0) {
-    const snap = await db.ref('requests').orderByChild('employeeId').equalTo(emp.id).once('value');
-    const reqs = snap.val() || {};
-    const used = Object.values(reqs).filter(r =>
-      r.type === selectedType && r.status === 'approved' && new Date(r.start).getFullYear() === year
-    ).reduce((a,r) => a + (r.days||1), 0);
-    const remaining = limit - used;
-    if (used + days > limit) {
-      const typeLabel = {vacation:'Vacation',sick:'Sick Day',personal:'Personal Day'}[selectedType]||selectedType;
-      showToast('⛔ Not enough ' + typeLabel + ' days left. You have ' + remaining + ' day' + (remaining===1?'':'s') + ' remaining out of ' + limit + '.','error');
-      return;
-    }
+    try {
+      const snap = await db.ref('requests').orderByChild('employeeId').equalTo(emp.id).once('value');
+      const reqs = snap.val() || {};
+      const used = Object.values(reqs).filter(r =>
+        r.type === selectedType && r.status === 'approved' && new Date(r.start).getFullYear() === year
+      ).reduce((a,r) => a + (r.days||1), 0);
+      const remaining = limit - used;
+      if (used + days > limit) {
+        const typeLabel = {vacation:'Vacation',sick:'Sick Day'}[selectedType]||selectedType;
+        showToast('⛔ Not enough ' + typeLabel + ' days left. You have ' + remaining + ' day' + (remaining===1?'':'s') + ' remaining out of ' + limit + '.','error');
+        return;
+      }
+    } catch(e) { console.warn('Limit check error:', e); }
   }
 
   const note = document.getElementById('req-note').value;
-  const typeLabel = {vacation:'Vacation',sick:'Sick Day',personal:'Personal Day'}[selectedType];
+  const typeLabel = {vacation:'Vacation', sick:'Sick Day'}[selectedType] || selectedType;
 
   const req = {
     employeeId: emp.id,
-    employeeName: `${emp.first} ${emp.last}`,
+    employeeName: emp.first + ' ' + emp.last,
     employeePhone: emp.phone || '',
     employeeEmail: emp.email || '',
     type: selectedType,
-    typeLabel,
-    start, end, days,
+    typeLabel: typeLabel,
+    start: start,
+    end: end,
+    days: days,
     note: note || '',
     status: 'pending',
     createdAt: Date.now(),
-    year
+    year: year
   };
 
   try {
-    const newRef = db.ref('requests').push();
-    const reqId = newRef.key;
-
-    await newRef.set(req);
+    const newRef = await db.ref('requests').push(req);
     notifyManager(req);
     sendPushNotification(req);
-    // Send confirmation email to employee
     sendSubmitConfirmationToEmployee(req);
     showToast('✅ Request submitted!','success');
     selectedType = null;
-
     document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
     document.getElementById('req-start').value = '';
     document.getElementById('req-end').value = '';
     document.getElementById('req-note').value = '';
-
-  } catch(e) { console.error(e); showToast('Error submitting. Try again.','error'); }
+  } catch(e) {
+    console.error('Submit error:', e);
+    showToast('Error: ' + (e.message || 'Could not submit. Check your connection.'),'error');
+  }
 }
 
 // ══════════════════════════════════════════
