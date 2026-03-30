@@ -2238,6 +2238,35 @@ async function uploadDoctorNote(empId, reqId, file) {
 // ══════════════════════════════════════════
 // ADMIN — UPLOAD DOCTOR'S NOTE
 // ══════════════════════════════════════════
+
+async function viewDoctorNote(reqId) {
+  const snap = await db.ref('requests/' + reqId).once('value');
+  const req = snap.val();
+  if (!req || !req.doctorNoteUrl) { showToast('No note found.', 'error'); return; }
+  // Open base64 image in new window
+  const win = window.open('', '_blank');
+  if (req.doctorNoteUrl.startsWith('data:image')) {
+    win.document.write('<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;min-height:100vh;">'+
+      '<img src="' + req.doctorNoteUrl + '" style="max-width:100%;max-height:100vh;object-fit:contain;">'+
+      '</body></html>');
+  } else if (req.doctorNoteUrl.startsWith('data:application/pdf')) {
+    win.document.write('<html><body style="margin:0;"><embed src="' + req.doctorNoteUrl + '" width="100%" height="100%" type="application/pdf"></body></html>');
+  } else {
+    win.location.href = req.doctorNoteUrl;
+  }
+}
+
+async function deleteAdminNote(reqId) {
+  if (!confirm('Delete this doctor\'s note?')) return;
+  await db.ref('requests/' + reqId).update({
+    doctorNoteUrl: null,
+    doctorNoteFile: null,
+    doctorNoteUploadedAt: null
+  });
+  showToast('Doctor\'s note deleted.', 'info');
+  loadAdminRequests();
+}
+
 async function uploadAdminNote(input, reqId) {
   const file = input.files[0];
   if (!file) return;
@@ -2336,16 +2365,17 @@ function reqAdminCard(id, r, showActions) {
   if (r.status==='approved') statusInfo = '<span style="font-size:.75rem;color:var(--green)">✅ Approved '+(decidedStr?'on '+decidedStr:'')+'</span>';
   if (r.status==='rejected') statusInfo = '<span style="font-size:.75rem;color:var(--red)">❌ Rejected '+(decidedStr?'on '+decidedStr:'')+(r.rejectReason?' — "'+r.rejectReason+'"':'')+'</span>';
   // Doctor's note badge
-  const notesBadge = r.doctorNoteUrl
-    ? '<a href="'+r.doctorNoteUrl+'" target="_blank" style="display:inline-flex;align-items:center;gap:.3rem;font-size:.75rem;background:#e8f4ff;color:#1a6eb5;border:1px solid #9ecfff;border-radius:6px;padding:.2rem .6rem;text-decoration:none;margin-top:3px;">🏥 View Doctor\'s Note</a>'
-    : (r.doctorNoteFile ? '<span style="font-size:.75rem;color:var(--muted)">🏥 Note: '+r.doctorNoteFile+'</span>' : '');
+  const notesBadge = '';
 
   let actionBtns = '';
   const eid = id;
   // Doctor's note upload button (always visible for sick day)
   const noteBtn = r.type === 'sick'
     ? (r.doctorNoteUrl
-        ? '<a href="'+r.doctorNoteUrl+'" target="_blank" class="btn btn-ghost btn-sm" style="background:#e8f4ff;color:#1a6eb5;border-color:#9ecfff;">🏥 View Note</a>'
+        ? '<div style="display:flex;gap:.3rem;">'+
+        '<button class="btn btn-ghost btn-sm" style="background:#e8f4ff;color:#1a6eb5;border-color:#9ecfff;" onclick="viewDoctorNote(&quot;'+eid+'&quot;)">🏥 View Note</button>'+
+        '<button class="btn btn-ghost btn-sm" style="background:#fdf0f0;color:#c0392b;border-color:#f0a0a0;" onclick="deleteAdminNote(&quot;'+eid+'&quot;)">🗑</button>'+
+      '</div>'
         : '<label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;background:#fff8e6;color:#7a5c00;border-color:#f0d060;" title="Upload doctor note">📎 Add Note<input type="file" accept="image/*,application/pdf" style="display:none" onchange="uploadAdminNote(this,&quot;'+eid+'&quot;)"></label>')
     : '';
 
@@ -2380,7 +2410,7 @@ function reqAdminCard(id, r, showActions) {
           (r.note?' &bull; <em>"'+r.note+'"</em>':'')+
         '</div>'+
         (statusInfo?'<div style="margin-top:3px;">'+statusInfo+'</div>':'')+
-        (notesBadge?'<div style="margin-top:4px;">'+notesBadge+'</div>':'')+
+
       '</div>'+
     '</div>'+
     '<div style="font-size:.78rem;color:var(--muted);white-space:nowrap;text-align:right;">'+submittedStr+'</div>'+
