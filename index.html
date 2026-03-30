@@ -699,7 +699,8 @@
         <p style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem;">Add your contact info so the manager can reach you <span style="color:#aaa;">(optional)</span></p>
         <div class="field" style="margin-bottom:.75rem;">
           <label style="font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">📱 Phone Number</label>
-          <input type="tel" id="setup-phone" placeholder="+1 (xxx) xxx-xxxx" style="margin-top:.3rem;">
+          <input type="tel" id="setup-phone" placeholder="+1 (xxx) xxx-xxxx" style="margin-top:.3rem;" required>
+          <div style="font-size:.72rem;color:var(--accent);margin-top:.25rem;">* Required</div>
         </div>
         <div class="field" style="margin-bottom:.75rem;">
           <label style="font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;">✉️ Email Address</label>
@@ -2736,7 +2737,7 @@ async function saveEmployee() {
 }
 
 async function deleteEmployee(id) {
-  if (!confirm('Delete this employee? This will also delete ALL their requests permanently.')) return;
+  if (!confirm('Delete this employee? This will permanently delete ALL their requests and doctor notes.')) return;
   try {
     // Delete employee
     await db.ref('employees/' + id).remove();
@@ -2814,41 +2815,91 @@ async function renderReport() {
   const content = document.getElementById('report-content');
   if (!Object.keys(emps).length) { content.innerHTML = '<div class="empty-state">No employees found.</div>'; return; }
 
-  const limitKeys = {vacation:'limitVac', sick:'limitSick', personal:'limitPersonal'};
-
   const rows = Object.entries(emps).sort((a,b) => (a[1].last||'').localeCompare(b[1].last||'')).map(([empId, e]) => {
     const myReqs = yearReqs.filter(r => r.employeeId === empId);
-    const total = myReqs.filter(r => r.status==='approved').reduce((a,r) => a+(r.days||1), 0);
+    const approvedReqs = myReqs.filter(r => r.status === 'approved');
+    const vacReqs = approvedReqs.filter(r => r.type === 'vacation');
+    const sickReqs = approvedReqs.filter(r => r.type === 'sick');
+    const vacUsed = vacReqs.reduce((a,r) => a+(r.days||1), 0);
+    const sickUsed = sickReqs.reduce((a,r) => a+(r.days||1), 0);
+    const vacLimit = e.limitVac || 0;
+    const sickLimit = e.limitSick || 0;
+    const vacLeft = vacLimit > 0 ? vacLimit - vacUsed : '∞';
+    const sickLeft = sickLimit > 0 ? sickLimit - sickUsed : '∞';
+    const total = vacUsed + sickUsed;
 
-    // Build tooltip content
-    const vacUsed     = myReqs.filter(r=>r.type==='vacation' && r.status==='approved').reduce((a,r)=>a+(r.days||1),0);
-    const sickUsed    = myReqs.filter(r=>r.type==='sick'     && r.status==='approved').reduce((a,r)=>a+(r.days||1),0);
-    const vacLimit    = e.limitVac      || 0;
-    const sickLimit   = e.limitSick     || 0;
-    const vacLeft     = vacLimit  > 0 ? vacLimit  - vacUsed  : '∞';
-    const sickLeft    = sickLimit > 0 ? sickLimit - sickUsed : '∞';
+    // Build request detail rows
+    const buildReqRows = (reqList, icon) => reqList.map(r =>
+      '<div style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem 0;border-bottom:0.5px solid #f0f0f0;">' +
+        '<span style="font-size:.8rem;flex-shrink:0;">' + icon + '</span>' +
+        '<div style="flex:1;font-size:.8rem;">' +
+          '<div>' + fmtDate(r.start) + (r.end !== r.start ? ' → ' + fmtDate(r.end) : '') + ' <b>(' + r.days + ' day' + (r.days>1?'s':'') + ')</b></div>' +
+          '<div style="color:#888;font-size:.75rem;">Submitted: ' + new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</div>' +
+          (r.note ? '<div style="color:#666;font-style:italic;font-size:.75rem;">Note: "' + r.note + '"</div>' : '') +
+        '</div>' +
+      '</div>'
+    ).join('');
 
-    const tooltip =
-      '<div class="report-tooltip">' +
-        '<div class="rtt-name">' + e.first + ' ' + e.last + '</div>' +
-        '<div class="rtt-row"><span>🌴 Vacation</span><span>' + vacUsed + ' used &nbsp;·&nbsp; <b>' + vacLeft + ' left</b>' + (vacLimit>0?' / '+vacLimit:'') + '</span></div>' +
-        '<div class="rtt-row"><span>🤒 Sick Days</span><span>' + sickUsed + ' used &nbsp;·&nbsp; <b>' + sickLeft + ' left</b>' + (sickLimit>0?' / '+sickLimit:'') + '</span></div>' +
-        '<div class="rtt-total">Total used this year: <b>' + total + ' day' + (total!==1?'s':'') + '</b></div>' +
-      '</div>';
+    const hasReqs = vacReqs.length > 0 || sickReqs.length > 0;
 
-    const statusDot = total > 0
-      ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:.5rem;flex-shrink:0;"></span>'
-      : '<span style="width:8px;height:8px;border-radius:50%;background:#ddd;display:inline-block;margin-right:.5rem;flex-shrink:0;"></span>';
-
-    return '<div class="report-name-row">' +
-      statusDot +
-      '<span class="report-name-text">' + e.first + ' ' + e.last + '</span>' +
-      '<span class="report-days-badge">' + (total > 0 ? total + ' day' + (total!==1?'s':'') + ' used' : 'No requests') + '</span>' +
-      tooltip +
+    return '<div style="background:#fff;border:1px solid var(--border);border-radius:10px;margin-bottom:.75rem;overflow:hidden;">' +
+      // Header row - clickable to expand
+      '<div onclick="toggleReportRow(this)" style="display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;cursor:pointer;background:#fafafa;">' +
+        '<span style="width:9px;height:9px;border-radius:50%;background:' + (hasReqs ? 'var(--accent)' : '#ddd') + ';flex-shrink:0;"></span>' +
+        '<span style="font-weight:600;flex:1;">' + e.first + ' ' + e.last + '</span>' +
+        '<span style="font-size:.78rem;color:var(--muted);">🌴 ' + vacUsed + '/' + (vacLimit||'∞') + ' &nbsp; 🤒 ' + sickUsed + '/' + (sickLimit||'∞') + '</span>' +
+        '<button data-eid="' + empId + '" data-year="' + year + '" onclick="event.stopPropagation();printEmpRecord(this)" style="padding:.25rem .6rem;border-radius:6px;border:1px solid #ddd;background:#fff;font-size:.75rem;cursor:pointer;margin-left:.5rem;">🖨️ Print</button>' +
+        '<span style="font-size:.75rem;color:var(--muted);margin-left:.25rem;">▼</span>' +
+      '</div>' +
+      // Detail section - hidden by default
+      '<div class="report-detail" style="display:none;padding:.75rem 1rem;background:#fff;">' +
+        (vacReqs.length ? '<div style="font-size:.78rem;font-weight:700;color:var(--accent);margin-bottom:.3rem;">🌴 Vacation</div>' + buildReqRows(vacReqs, '🌴') : '') +
+        (sickReqs.length ? '<div style="font-size:.78rem;font-weight:700;color:#2980b9;margin-top:' + (vacReqs.length?'.75rem':'0') + ';margin-bottom:.3rem;">🤒 Sick Days</div>' + buildReqRows(sickReqs, '🤒') : '') +
+        (!hasReqs ? '<div style="color:var(--muted);font-size:.82rem;text-align:center;padding:.5rem 0;">No approved requests this year</div>' : '') +
+        '<div style="margin-top:.75rem;padding-top:.5rem;border-top:1px solid #f0f0f0;font-size:.82rem;color:var(--muted);">Total used: <b style="color:var(--text);">' + total + ' day' + (total!==1?'s':'') + '</b></div>' +
+      '</div>' +
     '</div>';
   }).join('');
 
-  content.innerHTML = '<div class="report-name-list">' + rows + '</div>';
+  content.innerHTML = rows;
+}
+
+function toggleReportRow(header) {
+  const detail = header.nextElementSibling;
+  const arrow = header.querySelector('span:last-child');
+  if (detail.style.display === 'none') {
+    detail.style.display = 'block';
+    arrow.textContent = '▲';
+  } else {
+    detail.style.display = 'none';
+    arrow.textContent = '▼';
+  }
+}
+
+function printEmpRecord(btn) {
+  const card = btn.closest('div');
+  let detail = null;
+  let parent = card;
+  // Find the .report-detail sibling
+  while (parent && !detail) {
+    detail = parent.querySelector('.report-detail');
+    parent = parent.parentElement;
+  }
+  if (detail) detail.style.display = 'block';
+  const nameEl = btn.closest('div').querySelector('span[style*="font-weight:600"]');
+  const empName = nameEl ? nameEl.textContent : 'Employee';
+  const year = btn.dataset.year || '';
+  const printWin = window.open('', '_blank');
+  printWin.document.write('<html><head><title>' + empName + ' — ' + year + '</title>');
+  printWin.document.write('<style>body{font-family:Arial,sans-serif;padding:2rem;max-width:600px;margin:0 auto;}h2,h3{color:#c0392b;}div{margin:.3rem 0;font-size:14px;line-height:1.6;}</style>');
+  printWin.document.write('</head><body>');
+  printWin.document.write('<h2>Food Fair Wholesale Fresh Market</h2>');
+  printWin.document.write('<h3>' + empName + ' &mdash; ' + year + ' Time-Off Record</h3><hr>');
+  if (detail) printWin.document.write(detail.innerHTML);
+  printWin.document.write('<br><p style="color:#999;font-size:12px;border-top:1px solid #eee;padding-top:.5rem;">Printed from Food Fair Employee Services &middot; ' + new Date().toLocaleDateString() + '</p>');
+  printWin.document.write('</body></html>');
+  printWin.document.close();
+  setTimeout(() => { printWin.print(); }, 600);
 }
 
 
@@ -3089,7 +3140,10 @@ async function sendEmailToManager(req) {
 
 async function sendSubmitConfirmationToEmployee(req) {
   const empEmail = req.employeeEmail || currentEmployee.email || '';
-  if (!empEmail) return;
+  if (!empEmail) {
+    // No email - show in-app toast confirmation only
+    return;
+  }
   try {
     if (!window.emailjs) await loadScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js');
     emailjs.init('XmC0WkkY-M_QaYuK4');
