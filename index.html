@@ -2180,6 +2180,7 @@ function reqAdminCard(id, r, showActions) {
       noteBtn +
       '<button class="btn btn-green btn-sm" onclick="approveRequest(&quot;'+eid+'&quot;)">Approve</button>' +
       '<button class="btn btn-red btn-sm" onclick="openReject(&quot;'+eid+'&quot;)">Reject</button>' +
+      '<button class="btn btn-ghost btn-sm" style="color:#999;border-color:#ddd;" onclick="deleteRequest(&quot;'+eid+'&quot;)">🗑</button>' +
     '</div>';
   } else if (r.status==='rejected') {
     actionBtns = '<div style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">' + noteBtn +
@@ -2225,6 +2226,13 @@ async function approveRequest(id) {
   await db.ref(`requests/${id}`).update({ status: 'approved', decidedAt: Date.now() });
   showToast('✅ Request approved — email will open to notify employee','success');
   sendEmailToEmployee(req, 'approved', '');
+  loadAdminRequests();
+}
+
+async function deleteRequest(id) {
+  if (!confirm('Delete this request permanently?')) return;
+  await db.ref('requests/' + id).remove();
+  showToast('Request deleted', 'info');
   loadAdminRequests();
 }
 
@@ -2655,43 +2663,37 @@ function notifyManager(req) {
 
 async function sendEmailToManager(req) {
   let managers = [];
-  // Load from Firebase first for reliability
   try {
     if (db) {
       const snap = await db.ref('config/admin_managers').once('value');
       if (snap.val()) managers = snap.val();
     }
   } catch(e) {}
-  // Fall back to localStorage
   if (!managers.length) {
     try { managers = JSON.parse(localStorage.getItem('admin_managers') || '[]'); } catch(e) {}
   }
   const activeEmails = managers.filter(m => m.enabled && m.email).map(m => m.email);
-  if (!activeEmails.length) {
-    showToast('No managers set up. Go to Settings → Admin Managers.', 'error');
-    return;
+  if (!activeEmails.length) return;
+
+  try {
+    if (!window.emailjs) await loadScript('https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js');
+    emailjs.init('XmC0WkkY-M_QaYuK4');
+    const params = {
+      employee_name: req.employeeName,
+      request_type: req.typeLabel || req.type,
+      start_date: fmtDate(req.start),
+      end_date: fmtDate(req.end),
+      days: String(req.days),
+      note: req.note || 'None',
+      submitted_at: new Date(req.createdAt).toLocaleString()
+    };
+    for (const email of activeEmails) {
+      await emailjs.send('service_ftsfya8', 'template_eudncnb', { ...params, to_email: email });
+      console.log('Email sent silently to:', email);
+    }
+  } catch(e) {
+    console.error('EmailJS error:', e);
   }
-
-  const subject = encodeURIComponent('🗓 New Time-Off Request — ' + req.employeeName);
-  const body = encodeURIComponent([
-    'A new time-off request has been submitted.',
-    '',
-    'Employee: ' + req.employeeName,
-    'Type: ' + (req.typeLabel || req.type),
-    'Dates: ' + fmtDate(req.start) + (req.end !== req.start ? ' → ' + fmtDate(req.end) : ''),
-    'Days: ' + req.days,
-    'Note: ' + (req.note || 'None'),
-    'Submitted: ' + new Date(req.createdAt).toLocaleString(),
-    '',
-    'Log in to the Admin Panel to approve or reject.'
-  ].join('\n'));
-
-  // Show email popup so user can send without leaving the app
-  // Open Gmail compose in new tab — works without a mail app installed
-  const gmailUrl = 'https://mail.google.com/mail/?view=cm&to=' + 
-    encodeURIComponent(activeEmails.join(',')) + 
-    '&su=' + subject + '&body=' + body;
-  window.open(gmailUrl, '_blank');
 }
 
 
