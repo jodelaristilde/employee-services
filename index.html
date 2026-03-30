@@ -625,7 +625,7 @@
       <button id="btn-emp-login" class="btn btn-gold" style="padding:.85rem 3rem;font-size:1rem;" onclick="showScreen('screen-login')">Employee Login</button>
     </div>
     <div style="height:42px;display:flex;justify-content:center;align-items:center;">
-      <button id="btn-admin-panel" class="btn btn-outline" onclick="showScreen('screen-admin-login')" style="opacity:0;transition:opacity .3s;font-size:.75rem;padding:.4rem 1rem;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0'">Admin Panel</button>
+      <button id="btn-admin-panel" class="btn btn-outline" ondblclick="showScreen('screen-admin-login')" onclick="void(0)" style="opacity:0;transition:opacity .3s;font-size:.75rem;padding:.4rem 1rem;" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0'">Admin Panel</button>
     </div>
   </div>
 </div>
@@ -778,33 +778,15 @@
           <div class="type-card" id="type-sick" onclick="selectType('sick')"><span class="icon">🤒</span><span id="type-sick-lbl">Sick Day</span></div>
           
         </div>
-        <div class="field">
-          <label id="label-start-date" style="margin-bottom:.5rem;display:block;">Select Date Range</label>
-          <div id="range-calendar-wrap" style="background:#fafafa;border:1px solid var(--border);border-radius:12px;padding:1rem;user-select:none;">
-            <!-- Calendar header -->
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;">
-              <button type="button" onclick="calPrevMonth()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--accent);padding:.2rem .5rem;">‹</button>
-              <span id="cal-month-label" style="font-weight:600;font-size:.95rem;"></span>
-              <button type="button" onclick="calNextMonth()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--accent);padding:.2rem .5rem;">›</button>
-            </div>
-            <!-- Day headers -->
-            <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px;">
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Su</div>
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Mo</div>
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Tu</div>
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">We</div>
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Th</div>
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Fr</div>
-              <div style="text-align:center;font-size:.72rem;color:var(--muted);font-weight:600;">Sa</div>
-            </div>
-            <!-- Calendar days grid -->
-            <div id="cal-days-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;"></div>
-            <!-- Selected range display -->
-            <div id="cal-range-display" style="margin-top:.75rem;font-size:.82rem;color:var(--muted);text-align:center;min-height:1.2rem;"></div>
+        <div class="row">
+          <div class="field">
+            <label id="label-start-date">Start Date</label>
+            <input type="date" id="req-start" onchange="onStartDateChange(this.value)">
           </div>
-          <!-- Hidden inputs for form submission -->
-          <input type="hidden" id="req-start">
-          <input type="hidden" id="req-end">
+          <div class="field">
+            <label id="label-end-date">End Date</label>
+            <input type="date" id="req-end">
+          </div>
         </div>
         <div class="field">
           <label id="label-note">Note (optional)</label>
