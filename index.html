@@ -2,6 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="theme-color" content="#c0392b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Food Fair Staff">
+<link rel="manifest" href="data:application/json,{
+  &quot;name&quot;: &quot;Food Fair Employee Services&quot;,
+  &quot;short_name&quot;: &quot;FF Staff&quot;,
+  &quot;start_url&quot;: &quot;/&quot;,
+  &quot;display&quot;: &quot;standalone&quot;,
+  &quot;background_color&quot;: &quot;%23ffffff&quot;,
+  &quot;theme_color&quot;: &quot;%23c0392b&quot;,
+  &quot;icons&quot;: [{
+    &quot;src&quot;: &quot;https://img.icons8.com/color/192/food.png&quot;,
+    &quot;sizes&quot;: &quot;192x192&quot;,
+    &quot;type&quot;: &quot;image/png&quot;
+  }]
+}">
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Food Fair Employee Services</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -831,6 +849,7 @@
     <h1>🏪 Admin Panel</h1>
     <div class="header-right">
       <span class="text-muted" style="font-size:.82rem;">Manager View</span>
+      <button id="install-btn" style="display:none;padding:.3rem .8rem;border-radius:8px;border:1px solid var(--accent);background:#fff8f8;color:var(--accent);cursor:pointer;font-size:.78rem;font-weight:600;" onclick="installApp()">📲 Install App</button>
       <div id="notif-bell" style="position:relative;cursor:pointer;display:none;" onclick="switchAdmin('admin-requests')" title="New requests waiting">
         <span style="font-size:1.4rem;">🔔</span>
         <span id="notif-count-badge" style="position:absolute;top:-4px;right:-4px;background:#c0392b;color:#fff;border-radius:50%;width:18px;height:18px;font-size:10px;display:flex;align-items:center;justify-content:center;font-weight:700;">0</span>
@@ -2792,6 +2811,39 @@ async function renderReport() {
   content.innerHTML = '<div class="report-name-list">' + rows + '</div>';
 }
 
+
+
+// ══════════════════════════════════════════
+// PWA INSTALL
+// ══════════════════════════════════════════
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'block';
+});
+
+async function installApp() {
+  if (!deferredInstallPrompt) {
+    showToast('To install: click the 3 dots menu in Chrome → Install app', 'info');
+    return;
+  }
+  deferredInstallPrompt.prompt();
+  const result = await deferredInstallPrompt.userChoice;
+  if (result.outcome === 'accepted') {
+    showToast('App installed! Check your desktop.', 'success');
+    document.getElementById('install-btn').style.display = 'none';
+  }
+  deferredInstallPrompt = null;
+}
+
+window.addEventListener('appinstalled', () => {
+  const btn = document.getElementById('install-btn');
+  if (btn) btn.style.display = 'none';
+  showToast('Food Fair Staff app installed!', 'success');
+});
 
 // ══════════════════════════════════════════
 // DESKTOP NOTIFICATIONS + POLLING
