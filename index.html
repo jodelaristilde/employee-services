@@ -1538,13 +1538,24 @@ function calUpdateBoxes() {
 
   if (calEnd) {
     const days = Math.round((new Date(calEnd)-new Date(calStart))/86400000)+1;
-    endTxt.innerHTML = fmtDate(calEnd) + '<br><span style="font-size:.78rem;color:var(--accent);font-weight:700;">' + days + ' day' + (days>1?'s':'') + '</span>';
+    endTxt.textContent = fmtDate(calEnd);
     endTxt.style.color = '#222';
     if (endBox) endBox.style.borderColor = '#c0392b';
+    // Show days under end date box
+    let daysEl = document.getElementById('cal-days-count');
+    if (!daysEl) {
+      daysEl = document.createElement('div');
+      daysEl.id = 'cal-days-count';
+      daysEl.style.cssText = 'font-size:.82rem;font-weight:700;color:var(--accent);margin-top:.3rem;padding-left:.2rem;';
+      if (endBox && endBox.parentNode) endBox.parentNode.appendChild(daysEl);
+    }
+    daysEl.textContent = days + ' day' + (days>1?'s':'');
   } else {
     endTxt.textContent = 'Select date';
     endTxt.style.color = 'var(--muted)';
     if (endBox) endBox.style.borderColor = 'var(--border)';
+    const daysEl = document.getElementById('cal-days-count');
+    if (daysEl) daysEl.textContent = '';
   }
 }
 
