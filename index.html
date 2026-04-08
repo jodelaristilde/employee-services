@@ -3700,7 +3700,7 @@ function drToDateStr(isoStr) {
 }
 
 function drInitWeek() {
-  _drWeekOffset = 0;
+  _drWeekOffset = -1;
   // Populate pickers from saved CFG
   loadConfig();
   const startPick = document.getElementById('dr-week-start-pick');
