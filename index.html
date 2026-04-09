@@ -879,7 +879,7 @@
       <div class="admin-nav-item" onclick="switchAdmin('admin-employees')"><span class="nav-icon">👥</span>Employees</div>
       <div class="admin-nav-item" onclick="switchAdmin('admin-settings')"><span class="nav-icon">⚙️</span>Settings</div>
       <div class="admin-nav-item" onclick="switchAdmin('admin-report')"><span class="nav-icon">📊</span>Report</div>
-      <div class="admin-nav-item" onclick="switchAdmin('admin-date-report')"><span class="nav-icon">📅</span>Weekly Report</div>
+      <div class="admin-nav-item" onclick="switchAdmin('admin-date-report')"><span class="nav-icon">📅</span>Payroll</div>
       <div class="admin-nav-item" onclick="switchAdmin('admin-add-entry')"><span class="nav-icon">✏️</span>Add Entry</div>
     </nav>
     <div class="admin-content">
@@ -996,8 +996,8 @@
         </div>
 
         <div class="card" style="margin-bottom:1rem">
-          <div class="card-title">📅 Weekly Report Settings</div>
-          <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">Set your work week boundaries. The Weekly Report will use these as the default week range.</p>
+          <div class="card-title">📅 Payroll Settings</div>
+          <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem;">Set your work week boundaries. The Payroll will use these as the default week range.</p>
           <div style="display:flex;gap:1rem;flex-wrap:wrap;">
             <div class="field" style="flex:1;min-width:160px;">
               <label>Week Starts On</label>
@@ -1054,7 +1054,7 @@
 
       <!-- WEEKLY REPORT -->
       <div id="admin-date-report" class="admin-section">
-        <h2>Weekly Report</h2>
+        <h2>Payroll</h2>
         <div class="card" style="margin-bottom:1.2rem;">
           <!-- Row 1: Week start/end pickers -->
           <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;padding-bottom:.9rem;border-bottom:1px solid var(--border);">
@@ -4200,14 +4200,14 @@ function printDateRangeReport() {
   const weekLabel = document.getElementById('dr-week-label').textContent;
   const weekSub = document.getElementById('dr-week-sub').textContent;
   const win = window.open('','_blank');
-  win.document.write(`<html><head><title>Weekly Report</title>
+  win.document.write(`<html><head><title>Payroll</title>
   <style>body{font-family:Arial,sans-serif;padding:2rem;max-width:900px;margin:0 auto;}
   h2,h3{color:#c0392b;} table{width:100%;border-collapse:collapse;font-size:13px;}
   th{background:#f5f5f5;padding:.5rem .75rem;text-align:left;border-bottom:2px solid #ddd;text-transform:uppercase;font-size:11px;color:#666;}
   td{padding:.5rem .75rem;border-bottom:1px solid #eee;}
   .summary{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem;}
   </style></head><body>`);
-  win.document.write('<h2>Food Fair — Weekly Report</h2>');
+  win.document.write('<h2>Food Fair — Payroll</h2>');
   win.document.write(`<p style="color:#666;margin-bottom:1rem;"><strong>${weekLabel}</strong> &nbsp; ${weekSub} &nbsp;&nbsp; Printed: ${new Date().toLocaleDateString()}</p>`);
   win.document.write('<div class="summary">'+summary.innerHTML+'</div>');
   win.document.write(tableWrap.outerHTML);
