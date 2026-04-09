@@ -1274,7 +1274,25 @@
 </div>
 
 
-<!-- NOTIFICATION MODAL -->
+<!-- ══ PENDING REQUESTS LOGIN POPUP ══ -->
+<div class="modal-overlay" id="modal-pending-popup" style="z-index:200;">
+  <div class="modal" style="max-width:560px;width:100%;padding:0;border-radius:18px;overflow:hidden;">
+    <!-- Header -->
+    <div style="background:#c0392b;padding:1.5rem 1.8rem;text-align:center;">
+      <div style="font-size:2.5rem;margin-bottom:.4rem;">🔔</div>
+      <h2 style="color:#fff;font-family:'DM Serif Display',serif;font-size:1.6rem;margin:0;">Pending Requests</h2>
+      <p id="popup-subtitle" style="color:rgba(255,255,255,.8);font-size:.88rem;margin:.3rem 0 0;"></p>
+    </div>
+    <!-- Request list -->
+    <div id="popup-requests" style="max-height:55vh;overflow-y:auto;padding:1rem 1.2rem;"></div>
+    <!-- Footer -->
+    <div style="padding:.9rem 1.2rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;">
+      <button class="btn btn-ghost" onclick="closeModal('modal-pending-popup')">Close — handle later</button>
+    </div>
+  </div>
+</div>
+
+<!-- EMPLOYEE NOTIFICATION MODAL -->
 <div class="modal-overlay" id="modal-notif">
   <div class="modal" style="max-width:480px;">
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:.3rem;">
@@ -2664,6 +2682,75 @@ function loadAdminData() {
   loadSettingsForm();
   populateYearSelect();
   loadAdminManagers();
+  // Show pending requests popup after short delay to let Firebase connect
+  setTimeout(showPendingPopup, 800);
+}
+
+async function showPendingPopup() {
+  if (!db) return;
+  const snap = await db.ref('requests').orderByChild('status').equalTo('pending').once('value');
+  const reqs = snap.val();
+  if (!reqs) return;
+  const items = Object.entries(reqs).sort((a,b) => b[1].createdAt - a[1].createdAt);
+  if (!items.length) return;
+
+  const subtitle = document.getElementById('popup-subtitle');
+  const list = document.getElementById('popup-requests');
+  const typeIcons = {vacation:'🌴', sick:'🤒'};
+  const typeColors = {vacation:'#27ae60', sick:'#2980b9'};
+
+  subtitle.textContent = items.length + ' request' + (items.length !== 1 ? 's' : '') + ' waiting for your approval';
+
+  list.innerHTML = items.map(([id, r]) => {
+    const icon = typeIcons[r.type] || '📋';
+    const col  = typeColors[r.type] || '#888';
+    const submitted = new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+    const dateRange = r.end && r.end !== r.start ? r.start + ' → ' + r.end : r.start;
+    const note = r.note || r.managerNote || '';
+    return `<div id="popup-req-${id}" style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:1rem 1.1rem;margin-bottom:.75rem;">
+      <div style="display:flex;align-items:flex-start;gap:.75rem;">
+        <span style="font-size:1.6rem;flex-shrink:0;">${icon}</span>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:1rem;color:#1a1a1a;">${r.employeeName||'—'}</div>
+          <div style="font-size:.85rem;color:#555;margin-top:.2rem;">${r.typeLabel||r.type} &nbsp;·&nbsp; ${dateRange} &nbsp;·&nbsp; <strong>${r.days||1} day${(r.days||1)!==1?'s':''}</strong></div>
+          <div style="font-size:.78rem;color:#aaa;margin-top:.15rem;">Submitted ${submitted}</div>
+          ${note ? `<div style="font-size:.8rem;color:#666;font-style:italic;margin-top:.25rem;background:#fffbea;border:1px solid #f0d060;border-radius:6px;padding:.3rem .6rem;">📝 ${note}</div>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:.6rem;margin-top:.85rem;">
+        <button onclick="popupApprove('${id}')" style="flex:1;padding:.7rem;border-radius:9px;border:none;background:#27ae60;color:#fff;font-weight:700;font-size:.92rem;cursor:pointer;font-family:'DM Sans',sans-serif;">✅ Approve</button>
+        <button onclick="popupReject('${id}')" style="flex:1;padding:.7rem;border-radius:9px;border:none;background:#c0392b;color:#fff;font-weight:700;font-size:.92rem;cursor:pointer;font-family:'DM Sans',sans-serif;">❌ Reject</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  openModal('modal-pending-popup');
+}
+
+async function popupApprove(id) {
+  const card = document.getElementById('popup-req-' + id);
+  if (card) card.style.opacity = '.4';
+  const snap = await db.ref('requests/' + id).once('value');
+  const req = snap.val();
+  await db.ref('requests/' + id).update({ status: 'approved', decidedAt: Date.now() });
+  if (card) card.innerHTML = '<div style="text-align:center;padding:.75rem;color:#27ae60;font-weight:700;">✅ Approved!</div>';
+  sendEmailToEmployee(req, 'approved', '');
+  loadAdminRequests();
+  // Close popup if no more pending
+  const remaining = document.querySelectorAll('#popup-requests .btn');
+  if (!remaining.length) setTimeout(() => closeModal('modal-pending-popup'), 800);
+}
+
+async function popupReject(id) {
+  const reason = prompt('Reason for rejection? (optional — sent to employee)') || '';
+  const card = document.getElementById('popup-req-' + id);
+  if (card) card.style.opacity = '.4';
+  const snap = await db.ref('requests/' + id).once('value');
+  const req = snap.val();
+  await db.ref('requests/' + id).update({ status: 'rejected', rejectReason: reason, decidedAt: Date.now() });
+  if (card) card.innerHTML = '<div style="text-align:center;padding:.75rem;color:#c0392b;font-weight:700;">❌ Rejected</div>';
+  sendEmailToEmployee(req, 'rejected', reason);
+  loadAdminRequests();
 }
 
 async function loadAdminRequests() {
