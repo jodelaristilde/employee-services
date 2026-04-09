@@ -2683,48 +2683,57 @@ function loadAdminData() {
   populateYearSelect();
   loadAdminManagers();
   // Show pending requests popup after short delay to let Firebase connect
-  setTimeout(showPendingPopup, 800);
+  setTimeout(showPendingPopup, 1500);
 }
 
 async function showPendingPopup() {
+  // Wait for Firebase db to be ready (retry up to 3s)
+  let attempts = 0;
+  while (!db && attempts < 10) {
+    await new Promise(r => setTimeout(r, 300));
+    attempts++;
+  }
   if (!db) return;
-  const snap = await db.ref('requests').orderByChild('status').equalTo('pending').once('value');
-  const reqs = snap.val();
-  if (!reqs) return;
-  const items = Object.entries(reqs).sort((a,b) => b[1].createdAt - a[1].createdAt);
-  if (!items.length) return;
 
-  const subtitle = document.getElementById('popup-subtitle');
-  const list = document.getElementById('popup-requests');
-  const typeIcons = {vacation:'🌴', sick:'🤒'};
-  const typeColors = {vacation:'#27ae60', sick:'#2980b9'};
+  try {
+    const snap = await db.ref('requests').orderByChild('status').equalTo('pending').once('value');
+    const reqs = snap.val();
+    if (!reqs) return;
+    const items = Object.entries(reqs).sort((a,b) => b[1].createdAt - a[1].createdAt);
+    if (!items.length) return;
 
-  subtitle.textContent = items.length + ' request' + (items.length !== 1 ? 's' : '') + ' waiting for your approval';
+    const subtitle = document.getElementById('popup-subtitle');
+    const list = document.getElementById('popup-requests');
+    const typeIcons = {vacation:'🌴', sick:'🤒'};
+    const typeColors = {vacation:'#27ae60', sick:'#2980b9'};
 
-  list.innerHTML = items.map(([id, r]) => {
-    const icon = typeIcons[r.type] || '📋';
-    const col  = typeColors[r.type] || '#888';
-    const submitted = new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
-    const dateRange = r.end && r.end !== r.start ? r.start + ' → ' + r.end : r.start;
-    const note = r.note || r.managerNote || '';
-    return `<div id="popup-req-${id}" style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:1rem 1.1rem;margin-bottom:.75rem;">
-      <div style="display:flex;align-items:flex-start;gap:.75rem;">
-        <span style="font-size:1.6rem;flex-shrink:0;">${icon}</span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;font-size:1rem;color:#1a1a1a;">${r.employeeName||'—'}</div>
-          <div style="font-size:.85rem;color:#555;margin-top:.2rem;">${r.typeLabel||r.type} &nbsp;·&nbsp; ${dateRange} &nbsp;·&nbsp; <strong>${r.days||1} day${(r.days||1)!==1?'s':''}</strong></div>
-          <div style="font-size:.78rem;color:#aaa;margin-top:.15rem;">Submitted ${submitted}</div>
-          ${note ? `<div style="font-size:.8rem;color:#666;font-style:italic;margin-top:.25rem;background:#fffbea;border:1px solid #f0d060;border-radius:6px;padding:.3rem .6rem;">📝 ${note}</div>` : ''}
+    subtitle.textContent = items.length + ' request' + (items.length !== 1 ? 's' : '') + ' waiting for your approval';
+
+    list.innerHTML = items.map(([id, r]) => {
+      const icon = typeIcons[r.type] || '📋';
+      const col  = typeColors[r.type] || '#888';
+      const submitted = new Date(r.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+      const dateRange = r.end && r.end !== r.start ? r.start + ' → ' + r.end : r.start;
+      const note = r.note || r.managerNote || '';
+      return `<div id="popup-req-${id}" style="background:#fff;border:1px solid #e8e8e8;border-radius:12px;padding:1rem 1.1rem;margin-bottom:.75rem;">
+        <div style="display:flex;align-items:flex-start;gap:.75rem;">
+          <span style="font-size:1.6rem;flex-shrink:0;">${icon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:1rem;color:#1a1a1a;">${r.employeeName||'—'}</div>
+            <div style="font-size:.85rem;color:#555;margin-top:.2rem;">${r.typeLabel||r.type} &nbsp;·&nbsp; ${dateRange} &nbsp;·&nbsp; <strong>${r.days||1} day${(r.days||1)!==1?'s':''}</strong></div>
+            <div style="font-size:.78rem;color:#aaa;margin-top:.15rem;">Submitted ${submitted}</div>
+            ${note ? `<div style="font-size:.8rem;color:#666;font-style:italic;margin-top:.25rem;background:#fffbea;border:1px solid #f0d060;border-radius:6px;padding:.3rem .6rem;">📝 ${note}</div>` : ''}
+          </div>
         </div>
-      </div>
-      <div style="display:flex;gap:.6rem;margin-top:.85rem;">
-        <button onclick="popupApprove('${id}')" style="flex:1;padding:.7rem;border-radius:9px;border:none;background:#27ae60;color:#fff;font-weight:700;font-size:.92rem;cursor:pointer;font-family:'DM Sans',sans-serif;">✅ Approve</button>
-        <button onclick="popupReject('${id}')" style="flex:1;padding:.7rem;border-radius:9px;border:none;background:#c0392b;color:#fff;font-weight:700;font-size:.92rem;cursor:pointer;font-family:'DM Sans',sans-serif;">❌ Reject</button>
-      </div>
-    </div>`;
-  }).join('');
+        <div style="display:flex;gap:.6rem;margin-top:.85rem;">
+          <button onclick="popupApprove('${id}')" style="flex:1;padding:.7rem;border-radius:9px;border:none;background:#27ae60;color:#fff;font-weight:700;font-size:.92rem;cursor:pointer;font-family:'DM Sans',sans-serif;">✅ Approve</button>
+          <button onclick="popupReject('${id}')" style="flex:1;padding:.7rem;border-radius:9px;border:none;background:#c0392b;color:#fff;font-weight:700;font-size:.92rem;cursor:pointer;font-family:'DM Sans',sans-serif;">❌ Reject</button>
+        </div>
+      </div>`;
+    }).join('');
 
-  openModal('modal-pending-popup');
+    openModal('modal-pending-popup');
+  } catch(e) { console.error('Popup error:', e); }
 }
 
 async function popupApprove(id) {
